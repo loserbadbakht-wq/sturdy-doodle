@@ -124,7 +124,7 @@ export default {
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        touch-action: none; /* prevent default touch behaviors */
+        touch-action: none;
       }
       .player-wrapper video {
         width: 100%;
@@ -135,7 +135,6 @@ export default {
         touch-action: none;
       }
 
-      /* Controls – hidden by default, shown via JS class */
       .controls {
         position: absolute;
         bottom: 0;
@@ -155,7 +154,6 @@ export default {
         pointer-events: auto;
       }
 
-      /* Progress bar */
       .progress-container {
         flex: 1;
         position: relative;
@@ -389,26 +387,32 @@ export default {
     playerWrapper.addEventListener('mousemove', showControls);
     playerWrapper.addEventListener('mouseleave', hideControlsImmediately);
 
-    // ===== Touch events =====
-    // Tap  -> toggle play + show controls
-    // Hold -> toggle controls visibility (show/hide)
+    // ===== Touch events (ONLY on video, ignore if touch starts on controls) =====
     let holdTimer = null;
     let isHeld = false;
 
     function handleTouchStart(e) {
+      // Ignore touches that started on any control element
+      if (e.target.closest('.controls')) {
+        return;
+      }
       e.preventDefault();
       holdTimer = setTimeout(() => {
         isHeld = true;
-        // Toggle controls: if visible, hide; if hidden, show
+        // Toggle controls visibility
         if (controls.classList.contains('controls-show')) {
           hideControlsImmediately();
         } else {
           showControls();
         }
-      }, 600); // 600ms threshold for hold
+      }, 600);
     }
 
     function handleTouchEnd(e) {
+      // Ignore if touch ended on controls (though it shouldn't happen if start was ignored)
+      if (e.target.closest('.controls')) {
+        return;
+      }
       e.preventDefault();
       clearTimeout(holdTimer);
       if (!isHeld) {
@@ -424,11 +428,7 @@ export default {
       isHeld = false;
     }
 
-    // Attach touch events to the player wrapper and video
-    playerWrapper.addEventListener('touchstart', handleTouchStart, { passive: false });
-    playerWrapper.addEventListener('touchend', handleTouchEnd, { passive: false });
-    playerWrapper.addEventListener('touchcancel', handleTouchCancel, { passive: false });
-
+    // Attach touch events only to the video element
     video.addEventListener('touchstart', handleTouchStart, { passive: false });
     video.addEventListener('touchend', handleTouchEnd, { passive: false });
     video.addEventListener('touchcancel', handleTouchCancel, { passive: false });
