@@ -148,27 +148,27 @@ export default {
         background: rgba(0, 0, 0, 0.7);
         display: flex;
         align-items: center;
-        padding: 10px 15px;
-        gap: 15px;
+        padding: 8px 12px;  /* reduced padding */
+        gap: 10px;          /* smaller gap */
         opacity: 0;
         transition: opacity 0.3s ease;
       }
       .player-wrapper:hover .controls {
         opacity: 1;
       }
-      /* In embed mode, show controls always? Actually we keep hover behavior */
       button {
         background: none;
         border: none;
         color: #fff;
-        font-size: 18px;
+        font-size: 16px;    /* slightly smaller */
         cursor: pointer;
-        padding: 5px 8px;
+        padding: 4px 6px;   /* reduced */
       }
       input[type="range"] {
         cursor: pointer;
         accent-color: #ffffff;
         background: transparent;
+        height: 4px;        /* thinner */
       }
       #progress {
         flex: 1;
@@ -176,33 +176,35 @@ export default {
       .volume-container {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
       }
       #volume {
-        width: 70px;
+        width: 60px;        /* narrower */
       }
+
+      /* ===== URL BAR – now smaller ===== */
       .url-bar {
-        padding: 14px 16px;
+        padding: 8px 12px;          /* reduced from 14px 16px */
         background: #222;
         display: flex;
-        gap: 12px;
+        gap: 8px;
         align-items: center;
         border-top: 1px solid #333;
       }
       .url-bar label {
         color: #aaa;
-        font-size: 14px;
+        font-size: 12px;            /* smaller */
         font-weight: 600;
         white-space: nowrap;
       }
       .url-bar input[type="text"] {
         flex: 1;
-        padding: 10px 14px;
+        padding: 6px 10px;          /* reduced from 10px 14px */
         border: 1px solid #444;
-        border-radius: 6px;
+        border-radius: 4px;
         background: #111;
         color: #fff;
-        font-size: 14px;
+        font-size: 13px;            /* smaller */
         outline: none;
         transition: border 0.2s;
       }
@@ -212,17 +214,18 @@ export default {
       .url-bar button {
         background: #1DB954;
         color: #fff;
-        padding: 10px 24px;
-        border-radius: 6px;
+        padding: 6px 14px;          /* reduced from 10px 24px */
+        border-radius: 4px;
         font-weight: bold;
         border: none;
         cursor: pointer;
-        font-size: 14px;
+        font-size: 13px;            /* smaller */
         transition: background 0.2s;
       }
       .url-bar button:hover {
         background: #1ed760;
       }
+
       .empty-message {
         color: #aaa;
         font-size: 18px;
@@ -261,6 +264,10 @@ export default {
       <video id="video" src="__VIDEO_URL__"></video>
       <div class="controls">
         <button id="play-btn">▶</button>
+        <!-- Skip backward 10s -->
+        <button id="skip-back-btn" title="Skip backward 10 seconds">⏪</button>
+        <!-- Skip forward 10s -->
+        <button id="skip-forward-btn" title="Skip forward 10 seconds">⏩</button>
         <input type="range" id="progress" min="0" max="100" value="0">
         <div class="volume-container">
           <button id="mute-btn">🔊</button>
@@ -297,6 +304,8 @@ export default {
     // ===== DOM references =====
     const video = document.getElementById('video');
     const playBtn = document.getElementById('play-btn');
+    const skipBackBtn = document.getElementById('skip-back-btn');
+    const skipForwardBtn = document.getElementById('skip-forward-btn');
     const muteBtn = document.getElementById('mute-btn');
     const progress = document.getElementById('progress');
     const volume = document.getElementById('volume');
@@ -326,6 +335,14 @@ export default {
       else { video.muted = true; muteBtn.textContent = '🔇'; volume.value = 0; }
     }
 
+    // ===== Skip functions =====
+    function skipBack() {
+      video.currentTime = Math.max(0, video.currentTime - 10);
+    }
+    function skipForward() {
+      video.currentTime = Math.min(video.duration, video.currentTime + 10);
+    }
+
     // ===== Load video: encode and update URL =====
     function loadVideo() {
       let newUrl = urlInput.value.trim();
@@ -350,6 +367,8 @@ export default {
     progress.addEventListener('input', setProgress);
     volume.addEventListener('input', handleVolume);
     muteBtn.addEventListener('click', toggleMute);
+    skipBackBtn.addEventListener('click', skipBack);
+    skipForwardBtn.addEventListener('click', skipForward);
     loadBtn.addEventListener('click', loadVideo);
     urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
 
