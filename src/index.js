@@ -1,28 +1,50 @@
+// ===== STATIC VIDEO DATABASE (edit this) =====
+const VIDEOS = {
+  'demo': {
+    title: 'Demo Video',
+    url: 'https://example.com/demo.mp4',
+    thumb: 'https://example.com/demo-thumb.jpg'
+  },
+  'cat': {
+    title: 'Funny Cat',
+    url: 'https://example.com/cat.mp4',
+    thumb: 'https://example.com/cat-thumb.jpg'
+  },
+  // Add more videos here
+};
+
+// Default video if no ID is provided
+const DEFAULT_VIDEO = {
+  title: 'My Player',
+  url: '',
+  thumb: 'https://via.placeholder.com/640x360/1DB954/000000?text=Video'
+};
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const baseUrl = url.origin;
 
-    // ----- oEmbed endpoint (type: rich, no video hints) -----
+    // ----- oEmbed endpoint -----
     if (url.pathname === '/oembed') {
       const requestedUrl = url.searchParams.get('url') || '';
-      const params = new URL(requestedUrl).searchParams;
-      const videoUrl = params.get('video') || '';
+      // Extract the video ID from the requested URL
+      const videoId = extractIdFromUrl(requestedUrl);
+      const video = VIDEOS[videoId] || DEFAULT_VIDEO;
 
-      const iframeSrc = `${baseUrl}/?video=${encodeURIComponent(videoUrl)}`;
+      const iframeSrc = `${baseUrl}/watch/${videoId}`;
       const iframeHtml = `<iframe src="${iframeSrc}" width="640" height="400" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
 
       return new Response(JSON.stringify({
         version: '1.0',
-        type: 'rich',                // Essential: forces iframe, not native video
+        type: 'rich',
         provider_name: 'MyPlayer',
         provider_url: baseUrl,
-        title: videoUrl ? videoUrl.split('/').pop() : 'Video Player',
+        title: video.title,
         html: iframeHtml,
         width: 640,
         height: 400,
-        // Thumbnail is just a static placeholder (no .mp4 hint)
-        thumbnail_url: 'https://via.placeholder.com/640x360/1DB954/000000?text=Video',
+        thumbnail_url: video.thumb,
         thumbnail_width: 640,
         thumbnail_height: 360
       }), {
@@ -33,10 +55,18 @@ export default {
       });
     }
 
-    // ----- Main player page -----
-    const videoUrl = url.searchParams.get('video') || '';
-    const thumbnail = url.searchParams.get('thumb') || 'https://via.placeholder.com/640x360/1DB954/000000?text=Video';
-    const title = videoUrl ? videoUrl.split('/').pop() : 'My Video Player';
+    // ----- Main player page (routes: /watch/:id or /?id=...) -----
+    let videoId = url.searchParams.get('id') || '';
+    if (!videoId && url.pathname.startsWith('/watch/')) {
+      videoId = url.pathname.split('/watch/')[1];
+    }
+    const video = VIDEOS[videoId] || DEFAULT_VIDEO;
+    const title = video.title;
+    const videoUrl = video.url;
+    const thumbnail = video.thumb;
+
+    // Build the absolute page URL (for og:url)
+    const pageUrl = `${baseUrl}/watch/${videoId}`;
 
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
@@ -45,7 +75,7 @@ export default {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>__TITLE__</title>
 
-    <!-- ONLY SOCIAL TAGS – no og:video, no video hints -->
+    <!-- SOCIAL TAGS (no video hints) -->
     <meta property="og:title" content="__TITLE__" />
     <meta property="og:description" content="Watch this video on MyPlayer" />
     <meta property="og:image" content="__THUMBNAIL__" />
@@ -53,11 +83,12 @@ export default {
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
 
-    <!-- oEmbed discovery link (unchanged) -->
+    <!-- oEmbed discovery -->
     <link rel="alternate" type="application/json+oembed" 
           href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
 
     <style>
+      /* (your styles – unchanged) */
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
         background-color: #141414;
@@ -254,6 +285,10 @@ export default {
       video.play();
       playBtn.textContent = '⏸';
       emptyState.style.display = 'none';
+      // Update URL without reload – use the ID? We'll just keep the current ID.
+      // If you want to create a new ID, you'd need server-side mapping, so we just keep the same ID.
+      // For dynamic external URLs, we can't create an ID without a database, so we keep the video param.
+      // But we can also add a ?video= parameter for ad-hoc sharing.
       const params = new URLSearchParams(window.location.search);
       params.set('video', newUrl);
       window.history.pushState({}, '', window.location.pathname + '?' + params.toString());
@@ -280,8 +315,8 @@ export default {
       .replace(/__VIDEO_URL__/g, videoUrl.replace(/"/g, '&quot;'))
       .replace(/__TITLE__/g, title.replace(/"/g, '&quot;'))
       .replace(/__THUMBNAIL__/g, thumbnail)
-      .replace(/__PAGE_URL__/g, url.href)
-      .replace(/__ENCODED_PAGE_URL__/g, encodeURIComponent(url.href))
+      .replace(/__PAGE_URL__/g, pageUrl)
+      .replace(/__ENCODED_PAGE_URL__/g, encodeURIComponent(pageUrl))
       .replace(/__BASE_URL__/g, baseUrl)
       .replace(/__EMPTY_DISPLAY__/g, videoUrl ? 'none' : 'flex');
 
@@ -293,3 +328,18 @@ export default {
     });
   }
 };
+
+// Helper: extract video ID from the page URL
+function extractIdFromUrl(pageUrl) {
+  try {
+    const url = new URL(pageUrl);
+    // Try to get from path /watch/:id
+    if (url.pathname.startsWith('/watch/')) {
+      return url.pathname.split('/watch/')[1];
+    }
+    // Or from query parameter ?id=
+    return url.searchParams.get('id') || '';
+  } catch {
+    return '';
+  }
+  }
