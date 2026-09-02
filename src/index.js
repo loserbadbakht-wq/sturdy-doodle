@@ -154,28 +154,25 @@ export default {
         pointer-events: auto;
       }
 
-      /* ---- PROGRESS BAR (height stays 4px) ---- */
+      /* ---- PROGRESS BAR (FIXED STACKING) ---- */
       .progress-container {
         flex: 1;
         position: relative;
         height: 4px;
-        background: #000;
+        background: #1a1a1a;        /* dark grey so you can see the loaded bar */
         border-radius: 2px;
         cursor: pointer;
-        display: flex;
-        align-items: center;
       }
       .progress-loaded {
         position: absolute;
         left: 0;
         top: 0;
         height: 100%;
-        background: rgba(255, 255, 255, 0.6);   /* increased opacity */
+        background: rgba(255, 255, 255, 0.35);
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
         z-index: 1;
-        border: 1px solid rgba(255, 255, 255, 0.2); /* subtle border for visibility */
       }
       .progress-played {
         position: absolute;
@@ -198,6 +195,7 @@ export default {
         z-index: 3;
         cursor: pointer;
         margin: 0;
+        padding: 0;
       }
       .progress-container input[type="range"]::-webkit-slider-track {
         background: transparent;
@@ -469,10 +467,8 @@ export default {
         const bufferedEnd = video.buffered.end(video.buffered.length - 1);
         const percent = (bufferedEnd / video.duration) * 100;
         progressLoaded.style.width = Math.min(percent, 100) + '%';
-        console.log('Loaded percent:', percent); // debug log
       } else {
         progressLoaded.style.width = '0%';
-        console.log('Loaded: 0% (no buffered)');
       }
     }
 
