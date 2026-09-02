@@ -1,4 +1,4 @@
-// ===== Helper: encode/decode URL to/from base64url =====
+// ===== Helper functions =====
 function encodeUrl(url) {
   return btoa(url)
     .replace(/\+/g, '-')
@@ -158,7 +158,7 @@ export default {
       .progress-container {
         flex: 1;
         position: relative;
-        height: 4px;          /* fixed at 4px */
+        height: 4px;
         background: #000;
         border-radius: 2px;
         cursor: pointer;
@@ -170,18 +170,19 @@ export default {
         left: 0;
         top: 0;
         height: 100%;
-        background: rgba(255, 255, 255, 0.4); /* white semi‑transparent */
+        background: rgba(255, 255, 255, 0.6);   /* increased opacity */
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
         z-index: 1;
+        border: 1px solid rgba(255, 255, 255, 0.2); /* subtle border for visibility */
       }
       .progress-played {
         position: absolute;
         left: 0;
         top: 0;
         height: 100%;
-        background: #ff0000;   /* red */
+        background: #ff0000;
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
@@ -465,12 +466,13 @@ export default {
 
     function updateLoaded() {
       if (video.duration > 0 && video.buffered.length > 0) {
-        // Use the end of the last buffered range
         const bufferedEnd = video.buffered.end(video.buffered.length - 1);
         const percent = (bufferedEnd / video.duration) * 100;
         progressLoaded.style.width = Math.min(percent, 100) + '%';
+        console.log('Loaded percent:', percent); // debug log
       } else {
         progressLoaded.style.width = '0%';
+        console.log('Loaded: 0% (no buffered)');
       }
     }
 
