@@ -30,7 +30,6 @@ export default {
       } catch {}
       const videoUrl = hash ? decodeUrl(hash) : '';
 
-      // The iframe src should include embed=1 to hide the URL bar
       const iframeSrc = `${baseUrl}/watch/${hash}?embed=1`;
       const iframeHtml = `<iframe src="${iframeSrc}" width="640" height="400" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
 
@@ -58,7 +57,6 @@ export default {
     let videoUrl = '';
     let hash = '';
 
-    // Try to get video from /watch/:hash
     if (url.pathname.startsWith('/watch/')) {
       hash = url.pathname.split('/watch/')[1];
       if (hash) {
@@ -70,20 +68,14 @@ export default {
       }
     }
 
-    // Fallback: ?video=... (for direct testing)
     if (!videoUrl) {
       const direct = url.searchParams.get('video');
-      if (direct) {
-        videoUrl = direct;
-      }
+      if (direct) videoUrl = direct;
     }
 
     const title = videoUrl ? videoUrl.split('/').pop() : 'My Video Player';
     const thumbnail = url.searchParams.get('thumb') || 'https://via.placeholder.com/640x360/1DB954/000000?text=Video';
-
-    // Page URL for og:url (use clean /watch/ hash version)
     const pageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
-    // For oEmbed discovery, we need the page URL without embed=1 (or include it? We'll include)
     const oembedPageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
 
     const htmlTemplate = `<!DOCTYPE html>
@@ -93,7 +85,6 @@ export default {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>__TITLE__</title>
 
-    <!-- SOCIAL TAGS (no video hints) -->
     <meta property="og:title" content="__TITLE__" />
     <meta property="og:description" content="Watch this video on MyPlayer" />
     <meta property="og:image" content="__THUMBNAIL__" />
@@ -101,7 +92,6 @@ export default {
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
 
-    <!-- oEmbed discovery -->
     <link rel="alternate" type="application/json+oembed" 
           href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
 
@@ -124,22 +114,25 @@ export default {
         overflow: hidden;
         box-shadow: 0 10px 30px rgba(0,0,0,0.8);
       }
+      /* ===== Video wrapper with 16:9 aspect ratio ===== */
       .player-wrapper {
         position: relative;
+        width: 100%;
+        padding-bottom: 56.25%; /* 16:9 */
         background: #000;
-        aspect-ratio: 16 / 9;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         overflow: hidden;
       }
       .player-wrapper video {
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
         height: 100%;
-        display: block;
-        object-fit: contain; /* ensures video scales without cropping */
+        object-fit: contain;  /* ensures the whole video is visible */
         background: #000;
+        display: block;
       }
+      /* Controls overlay – positioned absolutely over the video */
       .controls {
         position: absolute;
         bottom: 0;
@@ -152,11 +145,11 @@ export default {
         gap: 15px;
         opacity: 0;
         transition: opacity 0.3s ease;
+        z-index: 2;
       }
       .player-wrapper:hover .controls {
         opacity: 1;
       }
-      /* In embed mode, show controls always? Actually we keep hover behavior */
       button {
         background: none;
         border: none;
@@ -224,29 +217,32 @@ export default {
         background: #1ed760;
       }
       .empty-message {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #111;
         color: #aaa;
         font-size: 18px;
         text-align: center;
-        background: #111;
-        padding: 40px;
-        width: 100%;
-        height: 100%;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         gap: 12px;
+        z-index: 1;
       }
       .empty-message span {
         font-size: 48px;
       }
 
-      /* ===== HIDE URL BAR IN EMBED MODE ===== */
+      /* ===== Embed mode: hide URL bar ===== */
       .embed-mode .url-bar {
         display: none !important;
       }
       .embed-mode .main-container {
-        border-radius: 0; /* remove rounded corners when embedded */
+        border-radius: 0;
         box-shadow: none;
       }
       body.embed-mode {
@@ -267,7 +263,7 @@ export default {
           <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
         </div>
       </div>
-      <div id="emptyState" class="empty-message" style="display: __EMPTY_DISPLAY__; position: absolute; top:0; left:0; right:0; bottom:0; background: #111;">
+      <div id="emptyState" class="empty-message" style="display: __EMPTY_DISPLAY__;">
         <span>🎬</span>
         <div>No video loaded</div>
         <div style="font-size:14px; color:#666;">Paste a URL below and click "Load"</div>
@@ -280,21 +276,15 @@ export default {
     </div>
   </div>
   <script>
-    // ===== Client‑side helpers (mirror server) =====
+    // (same JavaScript as before – unchanged)
     function encodeUrl(url) {
-      return btoa(url)
-        .replace(/\\+/g, '-')
-        .replace(/\\//g, '_')
-        .replace(/=+$/, '');
+      return btoa(url).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
     }
-
     function decodeUrl(hash) {
       let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
       while (base64.length % 4) base64 += '=';
       return atob(base64);
     }
-
-    // ===== DOM references =====
     const video = document.getElementById('video');
     const playBtn = document.getElementById('play-btn');
     const muteBtn = document.getElementById('mute-btn');
@@ -304,7 +294,6 @@ export default {
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
 
-    // ===== Player functions =====
     function togglePlay() {
       if (video.paused) { video.play(); playBtn.textContent = '⏸'; }
       else { video.pause(); playBtn.textContent = '▶'; }
@@ -325,25 +314,19 @@ export default {
       if (video.muted) { video.muted = false; muteBtn.textContent = '🔊'; volume.value = video.volume; }
       else { video.muted = true; muteBtn.textContent = '🔇'; volume.value = 0; }
     }
-
-    // ===== Load video: encode and update URL =====
     function loadVideo() {
       let newUrl = urlInput.value.trim();
       if (!newUrl) return;
-
       video.src = newUrl;
       video.load();
       video.play();
       playBtn.textContent = '⏸';
       emptyState.style.display = 'none';
-
       const hash = encodeUrl(newUrl);
       const cleanPath = '/watch/' + hash;
       window.history.pushState({}, '', cleanPath);
       document.title = newUrl.split('/').pop() || 'Video Player';
     }
-
-    // ===== Event listeners =====
     playBtn.addEventListener('click', togglePlay);
     video.addEventListener('click', togglePlay);
     video.addEventListener('timeupdate', updateProgress);
@@ -353,7 +336,6 @@ export default {
     loadBtn.addEventListener('click', loadVideo);
     urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
 
-    // ===== On page load, decode hash if present =====
     (function init() {
       const path = window.location.pathname;
       if (path.startsWith('/watch/')) {
@@ -380,10 +362,7 @@ export default {
 </body>
 </html>`;
 
-    // Determine body class: if embed mode, add 'embed-mode'
     const bodyClass = isEmbed ? 'embed-mode' : '';
-
-    // Replace placeholders
     let html = htmlTemplate
       .replace(/__VIDEO_URL__/g, videoUrl.replace(/"/g, '&quot;'))
       .replace(/__TITLE__/g, title.replace(/"/g, '&quot;'))
