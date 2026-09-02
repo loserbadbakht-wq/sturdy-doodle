@@ -1,10 +1,9 @@
-// src/index.js
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const baseUrl = url.origin;
 
-    // ----- oEmbed endpoint -----
+    // ----- oEmbed endpoint (unchanged) -----
     if (url.pathname === '/oembed') {
       const requestedUrl = url.searchParams.get('url') || '';
       const params = new URL(requestedUrl).searchParams;
@@ -36,7 +35,6 @@ export default {
     const thumbnail = url.searchParams.get('thumb') || 'https://via.placeholder.com/640x360/1DB954/000000?text=MyPlayer';
     const title = videoUrl ? videoUrl.split('/').pop() : 'My Video Player';
 
-    // The HTML template (same as previous, with placeholders)
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,40 +54,174 @@ export default {
     <link rel="alternate" type="application/json+oembed" 
           href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
     <style>
-      body { background-color: #141414; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
-      .video-container { position: relative; width: 100%; max-width: 800px; background-color: #000; border-radius: 8px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-      video { width: 100%; display: block; }
-      .controls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; padding: 10px; gap: 15px; opacity: 0; transition: opacity 0.3s ease; }
-      .video-container:hover .controls { opacity: 1; }
-      button { background: none; border: none; color: #fff; font-size: 16px; cursor: pointer; padding: 5px; }
-      input[type="range"] { cursor: pointer; accent-color: #ffffff; }
-      #progress { flex-grow: 1; }
-      .volume-container { display: flex; align-items: center; gap: 5px; }
-      #volume { width: 70px; }
-      .url-bar { padding: 12px; background: #222; display: flex; gap: 10px; align-items: center; border-top: 1px solid #333; }
-      .url-bar input[type="text"] { flex: 1; padding: 8px 12px; border: 1px solid #444; border-radius: 4px; background: #111; color: #fff; font-size: 14px; }
-      .url-bar button { background: #1DB954; color: #fff; padding: 8px 20px; border-radius: 4px; font-weight: bold; border: none; cursor: pointer; }
-      .url-bar button:hover { background: #1ed760; }
-      .url-bar label { color: #aaa; font-size: 13px; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        background-color: #141414;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        font-family: sans-serif;
+        padding: 20px;
+      }
+      .main-container {
+        width: 100%;
+        max-width: 800px;
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      }
+      /* ---- Player area ---- */
+      .player-wrapper {
+        position: relative;
+        background: #000;
+        /* Maintain 16:9 aspect ratio even without video */
+        aspect-ratio: 16 / 9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .player-wrapper video {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain;
+        background: #000;
+      }
+      /* Controls overlay (same as before) */
+      .controls {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        padding: 10px 15px;
+        gap: 15px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      .player-wrapper:hover .controls {
+        opacity: 1;
+      }
+      button {
+        background: none;
+        border: none;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+        padding: 5px 8px;
+      }
+      input[type="range"] {
+        cursor: pointer;
+        accent-color: #ffffff;
+        background: transparent;
+      }
+      #progress {
+        flex: 1;
+      }
+      .volume-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #volume {
+        width: 70px;
+      }
+      /* ---- URL bar (separate, below the player) ---- */
+      .url-bar {
+        padding: 14px 16px;
+        background: #222;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        border-top: 1px solid #333;
+      }
+      .url-bar label {
+        color: #aaa;
+        font-size: 14px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .url-bar input[type="text"] {
+        flex: 1;
+        padding: 10px 14px;
+        border: 1px solid #444;
+        border-radius: 6px;
+        background: #111;
+        color: #fff;
+        font-size: 14px;
+        outline: none;
+        transition: border 0.2s;
+      }
+      .url-bar input[type="text"]:focus {
+        border-color: #1DB954;
+      }
+      .url-bar button {
+        background: #1DB954;
+        color: #fff;
+        padding: 10px 24px;
+        border-radius: 6px;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.2s;
+      }
+      .url-bar button:hover {
+        background: #1ed760;
+      }
+      /* ---- Empty state message (centered over video) ---- */
+      .empty-message {
+        color: #aaa;
+        font-size: 18px;
+        text-align: center;
+        background: #111;
+        padding: 40px;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .empty-message span {
+        font-size: 48px;
+      }
     </style>
 </head>
 <body>
-  <div class="video-container">
-    <video id="video" src="__VIDEO_URL__"></video>
-    <div class="controls">
-      <button id="play-btn">▶</button>
-      <input type="range" id="progress" min="0" max="100" value="0">
-      <div class="volume-container">
-        <button id="mute-btn">🔊</button>
-        <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
+  <div class="main-container">
+    <!-- Player area -->
+    <div class="player-wrapper">
+      <video id="video" src="__VIDEO_URL__"></video>
+      <div class="controls">
+        <button id="play-btn">▶</button>
+        <input type="range" id="progress" min="0" max="100" value="0">
+        <div class="volume-container">
+          <button id="mute-btn">🔊</button>
+          <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
+        </div>
+      </div>
+      <!-- Empty state (hidden if video src exists) -->
+      <div id="emptyState" class="empty-message" style="display: __EMPTY_DISPLAY__; position: absolute; top:0; left:0; right:0; bottom:0; background: #111;">
+        <span>🎬</span>
+        <div>No video loaded</div>
+        <div style="font-size:14px; color:#666;">Paste a URL below and click "Load"</div>
       </div>
     </div>
+
+    <!-- URL bar (always visible below) -->
     <div class="url-bar">
       <label>🔗 Video URL</label>
       <input type="text" id="videoUrlInput" placeholder="https://example.com/video.mp4" value="__VIDEO_URL__">
       <button id="load-btn">Load</button>
     </div>
   </div>
+
   <script>
     const video = document.getElementById('video');
     const playBtn = document.getElementById('play-btn');
@@ -98,27 +230,51 @@ export default {
     const volume = document.getElementById('volume');
     const urlInput = document.getElementById('videoUrlInput');
     const loadBtn = document.getElementById('load-btn');
+    const emptyState = document.getElementById('emptyState');
 
+    // Toggle play/pause
     function togglePlay() {
-      if (video.paused) { video.play(); playBtn.textContent = '⏸'; } 
-      else { video.pause(); playBtn.textContent = '▶'; }
+      if (video.paused) {
+        video.play();
+        playBtn.textContent = '⏸';
+      } else {
+        video.pause();
+        playBtn.textContent = '▶';
+      }
     }
+
+    // Update progress bar
     function updateProgress() {
       const percentage = (video.currentTime / video.duration) * 100;
       progress.value = percentage || 0;
     }
+
+    // Seek via progress bar
     function setProgress() {
       const time = (progress.value * video.duration) / 100;
       video.currentTime = time;
     }
+
+    // Volume control
     function handleVolume() {
       video.volume = volume.value;
       muteBtn.textContent = video.volume === 0 ? '🔇' : '🔊';
     }
+
+    // Toggle mute
     function toggleMute() {
-      if (video.muted) { video.muted = false; muteBtn.textContent = '🔊'; volume.value = video.volume; } 
-      else { video.muted = true; muteBtn.textContent = '🔇'; volume.value = 0; }
+      if (video.muted) {
+        video.muted = false;
+        muteBtn.textContent = '🔊';
+        volume.value = video.volume;
+      } else {
+        video.muted = true;
+        muteBtn.textContent = '🔇';
+        volume.value = 0;
+      }
     }
+
+    // Load new video from input
     function loadVideo() {
       let newUrl = urlInput.value.trim();
       if (!newUrl) return;
@@ -126,10 +282,16 @@ export default {
       video.load();
       video.play();
       playBtn.textContent = '⏸';
+      // Hide empty state
+      emptyState.style.display = 'none';
+      // Update URL without reload
       const params = new URLSearchParams(window.location.search);
       params.set('video', newUrl);
-      window.history.pushState({}, '', window.location.pathname + '?' + params.toString());
+      const newPath = window.location.pathname + '?' + params.toString();
+      window.history.pushState({}, '', newPath);
     }
+
+    // Event listeners
     playBtn.addEventListener('click', togglePlay);
     video.addEventListener('click', togglePlay);
     video.addEventListener('timeupdate', updateProgress);
@@ -138,13 +300,13 @@ export default {
     muteBtn.addEventListener('click', toggleMute);
     loadBtn.addEventListener('click', loadVideo);
     urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
-    if (!video.src) {
-      video.style.display = 'none';
-      const container = document.querySelector('.video-container');
-      const msg = document.createElement('div');
-      msg.style.cssText = 'color: #aaa; padding: 40px; text-align: center; background: #111;';
-      msg.innerHTML = '🎬 No video loaded.<br>Paste a URL above and click "Load".';
-      container.insertBefore(msg, container.firstChild);
+
+    // If no video src, show empty state and hide controls?
+    if (!video.src || video.src === '') {
+      emptyState.style.display = 'flex';
+      // Controls are still there but we can keep them hidden by default
+    } else {
+      emptyState.style.display = 'none';
     }
   </script>
 </body>
@@ -157,7 +319,8 @@ export default {
       .replace(/__THUMBNAIL__/g, thumbnail)
       .replace(/__PAGE_URL__/g, url.href)
       .replace(/__ENCODED_PAGE_URL__/g, encodeURIComponent(url.href))
-      .replace(/__BASE_URL__/g, baseUrl);
+      .replace(/__BASE_URL__/g, baseUrl)
+      .replace(/__EMPTY_DISPLAY__/g, videoUrl ? 'none' : 'flex');
 
     return new Response(html, {
       headers: {
