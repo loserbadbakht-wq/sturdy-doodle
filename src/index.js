@@ -1,24 +1,19 @@
-// ===== STATIC VIDEO DATABASE (edit this) =====
-const VIDEOS = {
-  'demo': {
-    title: 'Demo Video',
-    url: 'https://example.com/demo.mp4',
-    thumb: 'https://example.com/demo-thumb.jpg'
-  },
-  'cat': {
-    title: 'Funny Cat',
-    url: 'https://example.com/cat.mp4',
-    thumb: 'https://example.com/cat-thumb.jpg'
-  },
-  // Add more videos here
-};
+// ===== Helper: encode/decode URL to/from base64url =====
+function encodeUrl(url) {
+  // Convert to base64, then make URL-safe
+  return btoa(url)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
 
-// Default video if no ID is provided
-const DEFAULT_VIDEO = {
-  title: 'My Player',
-  url: '',
-  thumb: 'https://via.placeholder.com/640x360/1DB954/000000?text=Video'
-};
+function decodeUrl(hash) {
+  // Convert back from URL-safe base64
+  let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
+  // Pad with '=' if needed
+  while (base64.length % 4) base64 += '=';
+  return atob(base64);
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -28,11 +23,17 @@ export default {
     // ----- oEmbed endpoint -----
     if (url.pathname === '/oembed') {
       const requestedUrl = url.searchParams.get('url') || '';
-      // Extract the video ID from the requested URL
-      const videoId = extractIdFromUrl(requestedUrl);
-      const video = VIDEOS[videoId] || DEFAULT_VIDEO;
+      // Extract the hash from the path (e.g., /watch/abc123)
+      let hash = '';
+      try {
+        const reqUrl = new URL(requestedUrl);
+        if (reqUrl.pathname.startsWith('/watch/')) {
+          hash = reqUrl.pathname.split('/watch/')[1];
+        }
+      } catch {}
+      const videoUrl = hash ? decodeUrl(hash) : '';
 
-      const iframeSrc = `${baseUrl}/watch/${videoId}`;
+      const iframeSrc = `${baseUrl}/watch/${hash}`;
       const iframeHtml = `<iframe src="${iframeSrc}" width="640" height="400" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
 
       return new Response(JSON.stringify({
@@ -40,11 +41,11 @@ export default {
         type: 'rich',
         provider_name: 'MyPlayer',
         provider_url: baseUrl,
-        title: video.title,
+        title: videoUrl ? videoUrl.split('/').pop() : 'Video Player',
         html: iframeHtml,
         width: 640,
         height: 400,
-        thumbnail_url: video.thumb,
+        thumbnail_url: 'https://via.placeholder.com/640x360/1DB954/000000?text=Video',
         thumbnail_width: 640,
         thumbnail_height: 360
       }), {
@@ -55,18 +56,36 @@ export default {
       });
     }
 
-    // ----- Main player page (routes: /watch/:id or /?id=...) -----
-    let videoId = url.searchParams.get('id') || '';
-    if (!videoId && url.pathname.startsWith('/watch/')) {
-      videoId = url.pathname.split('/watch/')[1];
-    }
-    const video = VIDEOS[videoId] || DEFAULT_VIDEO;
-    const title = video.title;
-    const videoUrl = video.url;
-    const thumbnail = video.thumb;
+    // ----- Main player page -----
+    let videoUrl = '';
+    let hash = '';
 
-    // Build the absolute page URL (for og:url)
-    const pageUrl = `${baseUrl}/watch/${videoId}`;
+    // Try to get video from /watch/:hash
+    if (url.pathname.startsWith('/watch/')) {
+      hash = url.pathname.split('/watch/')[1];
+      if (hash) {
+        try {
+          videoUrl = decodeUrl(hash);
+        } catch {
+          videoUrl = '';
+        }
+      }
+    }
+
+    // Fallback: ?video=... (for direct testing)
+    if (!videoUrl) {
+      const direct = url.searchParams.get('video');
+      if (direct) {
+        videoUrl = direct;
+        // If we have a direct URL, we could redirect to /watch/encoded, but we'll let JS handle it.
+      }
+    }
+
+    const title = videoUrl ? videoUrl.split('/').pop() : 'My Video Player';
+    const thumbnail = url.searchParams.get('thumb') || 'https://via.placeholder.com/640x360/1DB954/000000?text=Video';
+
+    // Build the page URL for og:url (use the clean /watch/ version if possible)
+    const pageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
 
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
@@ -88,7 +107,7 @@ export default {
           href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
 
     <style>
-      /* (your styles – unchanged) */
+      /* (your styles – same as before) */
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
         background-color: #141414;
@@ -248,6 +267,21 @@ export default {
     </div>
   </div>
   <script>
+    // ===== Client‑side helpers (mirror server) =====
+    function encodeUrl(url) {
+      return btoa(url)
+        .replace(/\\+/g, '-')
+        .replace(/\\//g, '_')
+        .replace(/=+$/, '');
+    }
+
+    function decodeUrl(hash) {
+      let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
+      while (base64.length % 4) base64 += '=';
+      return atob(base64);
+    }
+
+    // ===== DOM references =====
     const video = document.getElementById('video');
     const playBtn = document.getElementById('play-btn');
     const muteBtn = document.getElementById('mute-btn');
@@ -257,6 +291,7 @@ export default {
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
 
+    // ===== Player functions (unchanged) =====
     function togglePlay() {
       if (video.paused) { video.play(); playBtn.textContent = '⏸'; }
       else { video.pause(); playBtn.textContent = '▶'; }
@@ -277,22 +312,29 @@ export default {
       if (video.muted) { video.muted = false; muteBtn.textContent = '🔊'; volume.value = video.volume; }
       else { video.muted = true; muteBtn.textContent = '🔇'; volume.value = 0; }
     }
+
+    // ===== Load video: encode and update URL =====
     function loadVideo() {
       let newUrl = urlInput.value.trim();
       if (!newUrl) return;
+
+      // Set video source
       video.src = newUrl;
       video.load();
       video.play();
       playBtn.textContent = '⏸';
       emptyState.style.display = 'none';
-      // Update URL without reload – use the ID? We'll just keep the current ID.
-      // If you want to create a new ID, you'd need server-side mapping, so we just keep the same ID.
-      // For dynamic external URLs, we can't create an ID without a database, so we keep the video param.
-      // But we can also add a ?video= parameter for ad-hoc sharing.
-      const params = new URLSearchParams(window.location.search);
-      params.set('video', newUrl);
-      window.history.pushState({}, '', window.location.pathname + '?' + params.toString());
+
+      // Encode the URL and build clean /watch/ hash link
+      const hash = encodeUrl(newUrl);
+      const cleanPath = '/watch/' + hash;
+      // Update browser URL without reload
+      window.history.pushState({}, '', cleanPath);
+      // Also update the page title (optional)
+      document.title = newUrl.split('/').pop() || 'Video Player';
     }
+
+    // ===== Event listeners =====
     playBtn.addEventListener('click', togglePlay);
     video.addEventListener('click', togglePlay);
     video.addEventListener('timeupdate', updateProgress);
@@ -301,11 +343,30 @@ export default {
     muteBtn.addEventListener('click', toggleMute);
     loadBtn.addEventListener('click', loadVideo);
     urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
-    if (!video.src || video.src === '') {
-      emptyState.style.display = 'flex';
-    } else {
-      emptyState.style.display = 'none';
-    }
+
+    // ===== On page load, if we have a hash in the path, decode and set video =====
+    (function init() {
+      const path = window.location.pathname;
+      if (path.startsWith('/watch/')) {
+        const hash = path.split('/watch/')[1];
+        if (hash) {
+          try {
+            const decoded = decodeUrl(hash);
+            if (decoded) {
+              video.src = decoded;
+              video.load();
+              video.play();
+              playBtn.textContent = '⏸';
+              emptyState.style.display = 'none';
+              urlInput.value = decoded;
+              document.title = decoded.split('/').pop() || 'Video Player';
+            }
+          } catch {}
+        }
+      } else if (!video.src || video.src === '') {
+        emptyState.style.display = 'flex';
+      }
+    })();
   </script>
 </body>
 </html>`;
@@ -328,18 +389,3 @@ export default {
     });
   }
 };
-
-// Helper: extract video ID from the page URL
-function extractIdFromUrl(pageUrl) {
-  try {
-    const url = new URL(pageUrl);
-    // Try to get from path /watch/:id
-    if (url.pathname.startsWith('/watch/')) {
-      return url.pathname.split('/watch/')[1];
-    }
-    // Or from query parameter ?id=
-    return url.searchParams.get('id') || '';
-  } catch {
-    return '';
-  }
-  }
