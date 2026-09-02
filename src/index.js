@@ -170,7 +170,7 @@ export default {
         left: 0;
         top: 0;
         height: 100%;
-        background: rgba(255, 255, 255, 0.3); /* semi‑transparent white for buffered */
+        background: rgba(255, 255, 255, 0.5); /* more opaque white for buffered */
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
@@ -418,7 +418,7 @@ export default {
         } else {
           showControls();
         }
-      }, 400); // shorter hold duration
+      }, 400);
     }
 
     function handleTouchEnd(e) {
@@ -430,7 +430,6 @@ export default {
       e.preventDefault();
       clearTimeout(holdTimer);
       if (!isHeld) {
-        // Tap: toggle play and show controls
         togglePlay();
         showControls();
       }
@@ -462,6 +461,8 @@ export default {
         const percent = (video.currentTime / video.duration) * 100;
         progress.value = percent;
         progressPlayed.style.width = percent + '%';  // red bar
+        // Also update the loaded bar here to be safe
+        updateLoaded();
       }
     }
 
@@ -470,13 +471,14 @@ export default {
         const loaded = video.buffered.end(0);
         const percent = (loaded / video.duration) * 100;
         progressLoaded.style.width = Math.min(percent, 100) + '%';
+      } else {
+        progressLoaded.style.width = '0%';
       }
     }
 
     function setProgress() {
       const time = (progress.value * video.duration) / 100;
       video.currentTime = time;
-      // instantly update the red bar
       progressPlayed.style.width = progress.value + '%';
       showControls();
     }
@@ -534,13 +536,11 @@ export default {
     }
 
     // ===== Event listeners =====
-    // Mouse click on video
     video.addEventListener('click', () => {
       togglePlay();
       showControls();
     });
 
-    // Control buttons
     playBtn.addEventListener('click', togglePlay);
     skipBackBtn.addEventListener('click', skipBack);
     skipForwardBtn.addEventListener('click', skipForward);
@@ -550,7 +550,6 @@ export default {
     loadBtn.addEventListener('click', loadVideo);
     urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
 
-    // Video events
     video.addEventListener('timeupdate', updateProgress);
     video.addEventListener('progress', updateLoaded);
     video.addEventListener('durationchange', () => {
