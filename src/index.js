@@ -387,12 +387,11 @@ export default {
     playerWrapper.addEventListener('mousemove', showControls);
     playerWrapper.addEventListener('mouseleave', hideControlsImmediately);
 
-    // ===== Touch events (ONLY on video, ignore if touch starts on controls) =====
+    // ===== Touch events (only on video, ignores controls) =====
     let holdTimer = null;
     let isHeld = false;
 
     function handleTouchStart(e) {
-      // Ignore touches that started on any control element
       if (e.target.closest('.controls')) {
         return;
       }
@@ -405,12 +404,13 @@ export default {
         } else {
           showControls();
         }
-      }, 600);
+      }, 400); // <-- Shorter hold duration (400ms)
     }
 
     function handleTouchEnd(e) {
-      // Ignore if touch ended on controls (though it shouldn't happen if start was ignored)
       if (e.target.closest('.controls')) {
+        clearTimeout(holdTimer);
+        isHeld = false;
         return;
       }
       e.preventDefault();
@@ -428,7 +428,6 @@ export default {
       isHeld = false;
     }
 
-    // Attach touch events only to the video element
     video.addEventListener('touchstart', handleTouchStart, { passive: false });
     video.addEventListener('touchend', handleTouchEnd, { passive: false });
     video.addEventListener('touchcancel', handleTouchCancel, { passive: false });
