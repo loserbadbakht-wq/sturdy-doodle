@@ -32,7 +32,7 @@ export default {
 
       // The iframe src should include embed=1 to hide the URL bar
       const iframeSrc = `${baseUrl}/watch/${hash}?embed=1`;
-      const iframeHtml = `<iframe src="${iframeSrc}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+      const iframeHtml = `<iframe src="${iframeSrc}" width="100%" height="270" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
 
       return new Response(JSON.stringify({
         version: '1.0',
