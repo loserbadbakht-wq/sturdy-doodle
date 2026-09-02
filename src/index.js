@@ -18,7 +18,7 @@ export default {
     const baseUrl = url.origin;
     const isEmbed = url.searchParams.get('embed') === '1';
 
-    // ----- oEmbed endpoint -----
+    // ----- oEmbed endpoint (unchanged) -----
     if (url.pathname === '/oembed') {
       const requestedUrl = url.searchParams.get('url') || '';
       let hash = '';
@@ -154,12 +154,12 @@ export default {
         pointer-events: auto;
       }
 
-      /* ----- PROGRESS BAR (black background, white buffered, red played) ----- */
+      /* ---- SIMPLE PROGRESS BAR ---- */
       .progress-container {
         flex: 1;
         position: relative;
         height: 4px;
-        background: #000; /* black empty background */
+        background: #000;          /* black empty */
         border-radius: 2px;
         cursor: pointer;
         display: flex;
@@ -170,7 +170,7 @@ export default {
         left: 0;
         top: 0;
         height: 100%;
-        background: rgba(255, 255, 255, 0.5); /* more opaque white for buffered */
+        background: rgba(255, 255, 255, 0.4); /* white semi‑transparent */
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
@@ -181,7 +181,7 @@ export default {
         left: 0;
         top: 0;
         height: 100%;
-        background: #ff0000; /* red for played portion */
+        background: #ff0000;       /* red */
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
@@ -350,7 +350,7 @@ export default {
     </div>
   </div>
   <script>
-    // ===== Client‑side helpers =====
+    // ===== Helpers =====
     function encodeUrl(url) {
       return btoa(url)
         .replace(/\\+/g, '-')
@@ -401,18 +401,15 @@ export default {
     playerWrapper.addEventListener('mousemove', showControls);
     playerWrapper.addEventListener('mouseleave', hideControlsImmediately);
 
-    // ===== Touch events (only on video, ignores controls) =====
+    // ===== Touch events =====
     let holdTimer = null;
     let isHeld = false;
 
     function handleTouchStart(e) {
-      if (e.target.closest('.controls')) {
-        return;
-      }
+      if (e.target.closest('.controls')) return;
       e.preventDefault();
       holdTimer = setTimeout(() => {
         isHeld = true;
-        // Toggle controls visibility
         if (controls.classList.contains('controls-show')) {
           hideControlsImmediately();
         } else {
@@ -460,16 +457,16 @@ export default {
       if (video.duration > 0) {
         const percent = (video.currentTime / video.duration) * 100;
         progress.value = percent;
-        progressPlayed.style.width = percent + '%';  // red bar
-        // Also update the loaded bar here to be safe
-        updateLoaded();
+        progressPlayed.style.width = percent + '%';
+        updateLoaded(); // also update buffered bar each time
       }
     }
 
     function updateLoaded() {
       if (video.duration > 0 && video.buffered.length > 0) {
-        const loaded = video.buffered.end(0);
-        const percent = (loaded / video.duration) * 100;
+        // Get the end of the last buffered range
+        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+        const percent = (bufferedEnd / video.duration) * 100;
         progressLoaded.style.width = Math.min(percent, 100) + '%';
       } else {
         progressLoaded.style.width = '0%';
@@ -552,6 +549,7 @@ export default {
 
     video.addEventListener('timeupdate', updateProgress);
     video.addEventListener('progress', updateLoaded);
+    video.addEventListener('loadeddata', updateLoaded);
     video.addEventListener('durationchange', () => {
       resetLoaded();
       progressPlayed.style.width = '0%';
