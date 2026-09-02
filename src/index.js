@@ -31,7 +31,7 @@ export default {
       const videoUrl = hash ? decodeUrl(hash) : '';
 
       const iframeSrc = `${baseUrl}/watch/${hash}?embed=1`;
-      const iframeHtml = `<iframe src="${iframeSrc}" border-radius: 12px" width="150%" height="100%" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+      const iframeHtml = `<iframe src="${iframeSrc}" border-radius: 12px" width="100%" height="150%" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
 
       return new Response(JSON.stringify({
         version: '1.0',
