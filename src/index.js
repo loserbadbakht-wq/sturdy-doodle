@@ -84,7 +84,7 @@ export default {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>__TITLE__</title>
 
     <meta property="og:title" content="__TITLE__" />
@@ -124,6 +124,7 @@ export default {
         align-items: center;
         justify-content: center;
         overflow: hidden;
+        touch-action: none; /* prevent default touch behaviors */
       }
       .player-wrapper video {
         width: 100%;
@@ -131,6 +132,7 @@ export default {
         display: block;
         object-fit: contain;
         background: #000;
+        touch-action: none;
       }
 
       /* Controls – hidden by default, shown via JS class */
@@ -146,28 +148,30 @@ export default {
         gap: 10px;
         opacity: 0;
         transition: opacity 0.3s ease;
-        pointer-events: none;  /* so clicks pass through when hidden */
+        pointer-events: none;
       }
       .controls.controls-show {
         opacity: 1;
         pointer-events: auto;
       }
 
-      /* Progress bar container – for loading fill */
+      /* Progress bar */
       .progress-container {
         flex: 1;
         position: relative;
-        height: 4px;  /* match input height */
+        height: 4px;
         display: flex;
         align-items: center;
         cursor: pointer;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
       }
       .progress-loaded {
         position: absolute;
         left: 0;
         top: 0;
         height: 100%;
-        background: rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.4);
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
@@ -185,8 +189,6 @@ export default {
         margin: 0;
       }
       .progress-container input[type="range"]::-webkit-slider-track {
-        width: 100%;
-        height: 4px;
         background: transparent;
       }
       .progress-container input[type="range"]::-webkit-slider-thumb {
@@ -201,7 +203,6 @@ export default {
         box-shadow: 0 0 4px rgba(0,0,0,0.6);
       }
       .progress-container input[type="range"]::-moz-range-track {
-        height: 4px;
         background: transparent;
         border: none;
       }
@@ -367,7 +368,7 @@ export default {
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
 
-    // ===== Controls visibility =====
+    // ===== Controls visibility with 3‑second auto‑hide =====
     let hideTimeout;
 
     function showControls() {
@@ -383,6 +384,55 @@ export default {
       clearTimeout(hideTimeout);
     }
 
+    // Mouse events
+    playerWrapper.addEventListener('mouseenter', showControls);
+    playerWrapper.addEventListener('mousemove', showControls);
+    playerWrapper.addEventListener('mouseleave', hideControlsImmediately);
+
+    // ===== Touch events =====
+    // Tap  -> toggle play + show controls
+    // Hold -> toggle controls visibility (show/hide)
+    let holdTimer = null;
+    let isHeld = false;
+
+    function handleTouchStart(e) {
+      e.preventDefault();
+      holdTimer = setTimeout(() => {
+        isHeld = true;
+        // Toggle controls: if visible, hide; if hidden, show
+        if (controls.classList.contains('controls-show')) {
+          hideControlsImmediately();
+        } else {
+          showControls();
+        }
+      }, 600); // 600ms threshold for hold
+    }
+
+    function handleTouchEnd(e) {
+      e.preventDefault();
+      clearTimeout(holdTimer);
+      if (!isHeld) {
+        // Tap: toggle play and show controls
+        togglePlay();
+        showControls();
+      }
+      isHeld = false;
+    }
+
+    function handleTouchCancel(e) {
+      clearTimeout(holdTimer);
+      isHeld = false;
+    }
+
+    // Attach touch events to the player wrapper and video
+    playerWrapper.addEventListener('touchstart', handleTouchStart, { passive: false });
+    playerWrapper.addEventListener('touchend', handleTouchEnd, { passive: false });
+    playerWrapper.addEventListener('touchcancel', handleTouchCancel, { passive: false });
+
+    video.addEventListener('touchstart', handleTouchStart, { passive: false });
+    video.addEventListener('touchend', handleTouchEnd, { passive: false });
+    video.addEventListener('touchcancel', handleTouchCancel, { passive: false });
+
     // ===== Player functions =====
     function togglePlay() {
       if (video.paused) {
@@ -392,7 +442,6 @@ export default {
         video.pause();
         playBtn.textContent = '▶';
       }
-      showControls();
     }
 
     function updateProgress() {
@@ -466,15 +515,13 @@ export default {
     }
 
     // ===== Event listeners =====
-    playerWrapper.addEventListener('mouseenter', showControls);
-    playerWrapper.addEventListener('mousemove', showControls);
-    playerWrapper.addEventListener('mouseleave', hideControlsImmediately);
-
+    // Mouse click on video
     video.addEventListener('click', () => {
       togglePlay();
       showControls();
     });
 
+    // Control buttons
     playBtn.addEventListener('click', togglePlay);
     skipBackBtn.addEventListener('click', skipBack);
     skipForwardBtn.addEventListener('click', skipForward);
@@ -484,6 +531,7 @@ export default {
     loadBtn.addEventListener('click', loadVideo);
     urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
 
+    // Video events
     video.addEventListener('timeupdate', updateProgress);
     video.addEventListener('progress', updateLoaded);
     video.addEventListener('durationchange', resetLoaded);
