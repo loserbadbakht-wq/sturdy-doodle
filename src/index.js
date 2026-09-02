@@ -18,7 +18,7 @@ export default {
     const baseUrl = url.origin;
     const isEmbed = url.searchParams.get('embed') === '1';
 
-    // ----- oEmbed endpoint (unchanged) -----
+    // ----- oEmbed endpoint -----
     if (url.pathname === '/oembed') {
       const requestedUrl = url.searchParams.get('url') || '';
       let hash = '';
@@ -154,12 +154,12 @@ export default {
         pointer-events: auto;
       }
 
-      /* ---- SIMPLE PROGRESS BAR ---- */
+      /* ---- PROGRESS BAR (height stays 4px) ---- */
       .progress-container {
         flex: 1;
         position: relative;
-        height: 4px;
-        background: #000;          /* black empty */
+        height: 4px;          /* fixed at 4px */
+        background: #000;
         border-radius: 2px;
         cursor: pointer;
         display: flex;
@@ -181,7 +181,7 @@ export default {
         left: 0;
         top: 0;
         height: 100%;
-        background: #ff0000;       /* red */
+        background: #ff0000;   /* red */
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
@@ -211,6 +211,7 @@ export default {
         cursor: pointer;
         margin-top: -4px;
         box-shadow: 0 0 4px rgba(0,0,0,0.6);
+        border: 2px solid #ff0000;
       }
       .progress-container input[type="range"]::-moz-range-track {
         background: transparent;
@@ -222,7 +223,7 @@ export default {
         border-radius: 50%;
         background: #fff;
         cursor: pointer;
-        border: none;
+        border: 2px solid #ff0000;
       }
 
       button {
@@ -380,7 +381,7 @@ export default {
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
 
-    // ===== Controls visibility with 3‑second auto‑hide =====
+    // ===== Controls visibility =====
     let hideTimeout;
 
     function showControls() {
@@ -458,13 +459,13 @@ export default {
         const percent = (video.currentTime / video.duration) * 100;
         progress.value = percent;
         progressPlayed.style.width = percent + '%';
-        updateLoaded(); // also update buffered bar each time
+        updateLoaded();
       }
     }
 
     function updateLoaded() {
       if (video.duration > 0 && video.buffered.length > 0) {
-        // Get the end of the last buffered range
+        // Use the end of the last buffered range
         const bufferedEnd = video.buffered.end(video.buffered.length - 1);
         const percent = (bufferedEnd / video.duration) * 100;
         progressLoaded.style.width = Math.min(percent, 100) + '%';
