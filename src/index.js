@@ -154,26 +154,38 @@ export default {
         pointer-events: auto;
       }
 
+      /* ----- PROGRESS BAR (black background, white buffered, red played) ----- */
       .progress-container {
         flex: 1;
         position: relative;
         height: 4px;
+        background: #000; /* black empty background */
+        border-radius: 2px;
+        cursor: pointer;
         display: flex;
         align-items: center;
-        cursor: pointer;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 2px;
       }
       .progress-loaded {
         position: absolute;
         left: 0;
         top: 0;
         height: 100%;
-        background: rgba(255, 255, 255, 0.4);
+        background: rgba(255, 255, 255, 0.3); /* semi‑transparent white for buffered */
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
         z-index: 1;
+      }
+      .progress-played {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        background: #ff0000; /* red for played portion */
+        border-radius: 2px;
+        pointer-events: none;
+        width: 0%;
+        z-index: 2;
       }
       .progress-container input[type="range"] {
         width: 100%;
@@ -182,7 +194,7 @@ export default {
         appearance: none;
         background: transparent;
         position: relative;
-        z-index: 2;
+        z-index: 3;
         cursor: pointer;
         margin: 0;
       }
@@ -317,6 +329,7 @@ export default {
         <button id="skip-forward-btn" title="Skip forward 10 seconds">⏩</button>
         <div class="progress-container">
           <div class="progress-loaded" id="progress-loaded"></div>
+          <div class="progress-played" id="progress-played"></div>
           <input type="range" id="progress" min="0" max="100" value="0">
         </div>
         <div class="volume-container">
@@ -361,6 +374,7 @@ export default {
     const muteBtn = document.getElementById('mute-btn');
     const progress = document.getElementById('progress');
     const progressLoaded = document.getElementById('progress-loaded');
+    const progressPlayed = document.getElementById('progress-played');
     const volume = document.getElementById('volume');
     const urlInput = document.getElementById('videoUrlInput');
     const loadBtn = document.getElementById('load-btn');
@@ -404,7 +418,7 @@ export default {
         } else {
           showControls();
         }
-      }, 400); // <-- Shorter hold duration (400ms)
+      }, 400); // shorter hold duration
     }
 
     function handleTouchEnd(e) {
@@ -444,13 +458,26 @@ export default {
     }
 
     function updateProgress() {
-      const percentage = (video.currentTime / video.duration) * 100;
-      progress.value = percentage || 0;
+      if (video.duration > 0) {
+        const percent = (video.currentTime / video.duration) * 100;
+        progress.value = percent;
+        progressPlayed.style.width = percent + '%';  // red bar
+      }
+    }
+
+    function updateLoaded() {
+      if (video.duration > 0 && video.buffered.length > 0) {
+        const loaded = video.buffered.end(0);
+        const percent = (loaded / video.duration) * 100;
+        progressLoaded.style.width = Math.min(percent, 100) + '%';
+      }
     }
 
     function setProgress() {
       const time = (progress.value * video.duration) / 100;
       video.currentTime = time;
+      // instantly update the red bar
+      progressPlayed.style.width = progress.value + '%';
       showControls();
     }
 
@@ -482,14 +509,6 @@ export default {
       showControls();
     }
 
-    // ===== Loading progress =====
-    function updateLoaded() {
-      if (video.duration > 0 && video.buffered.length > 0) {
-        const loaded = video.buffered.end(0);
-        const percent = (loaded / video.duration) * 100;
-        progressLoaded.style.width = Math.min(percent, 100) + '%';
-      }
-    }
     function resetLoaded() {
       progressLoaded.style.width = '0%';
     }
@@ -505,6 +524,7 @@ export default {
       playBtn.textContent = '⏸';
       emptyState.style.display = 'none';
       resetLoaded();
+      progressPlayed.style.width = '0%';
       showControls();
 
       const hash = encodeUrl(newUrl);
@@ -533,7 +553,10 @@ export default {
     // Video events
     video.addEventListener('timeupdate', updateProgress);
     video.addEventListener('progress', updateLoaded);
-    video.addEventListener('durationchange', resetLoaded);
+    video.addEventListener('durationchange', () => {
+      resetLoaded();
+      progressPlayed.style.width = '0%';
+    });
 
     // ===== On page load =====
     (function init() {
