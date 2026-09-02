@@ -1,7 +1,11 @@
-// ===== Helper: encode/decode =====
+// ===== Helper: encode/decode URL to/from base64url =====
 function encodeUrl(url) {
-  return btoa(url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return btoa(url)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
+
 function decodeUrl(hash) {
   let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
   while (base64.length % 4) base64 += '=';
@@ -14,7 +18,7 @@ export default {
     const baseUrl = url.origin;
     const isEmbed = url.searchParams.get('embed') === '1';
 
-    // ----- oEmbed endpoint -----
+    // ----- oEmbed endpoint (unchanged) -----
     if (url.pathname === '/oembed') {
       const requestedUrl = url.searchParams.get('url') || '';
       let hash = '';
@@ -40,11 +44,14 @@ export default {
         thumbnail_width: 640,
         thumbnail_height: 360
       }), {
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
       });
     }
 
-    // ----- Main page -----
+    // ----- Main player page -----
     let videoUrl = '';
     let hash = '';
     if (url.pathname.startsWith('/watch/')) {
@@ -69,17 +76,21 @@ export default {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>__TITLE__</title>
+
     <meta property="og:title" content="__TITLE__" />
     <meta property="og:description" content="Watch this video on MyPlayer" />
     <meta property="og:image" content="__THUMBNAIL__" />
     <meta property="og:url" content="__PAGE_URL__" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="alternate" type="application/json+oembed" href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
+
+    <link rel="alternate" type="application/json+oembed" 
+          href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
+
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
-        background: #141414;
+        background-color: #141414;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -95,22 +106,28 @@ export default {
         overflow: hidden;
         box-shadow: 0 10px 30px rgba(0,0,0,0.8);
       }
+      /* ===== Video wrapper – simple, no absolute positioning ===== */
       .player-wrapper {
         width: 100%;
         background: #000;
         display: flex;
-        justify-content: center;
+        flex-direction: column;
         align-items: center;
+        justify-content: center;
       }
       .player-wrapper video {
         width: 100%;
         height: auto;
         display: block;
         background: #000;
+        /* if you want to force aspect ratio, use this: */
+        /* aspect-ratio: 16 / 9; */
+        /* object-fit: contain; */
       }
+      /* ===== Controls positioned below video ===== */
       .controls {
         width: 100%;
-        background: rgba(0,0,0,0.8);
+        background: rgba(0, 0, 0, 0.8);
         display: flex;
         align-items: center;
         padding: 8px 12px;
@@ -130,10 +147,17 @@ export default {
         accent-color: #1DB954;
         background: transparent;
       }
-      #progress { flex: 1; }
-      .volume-container { display: flex; align-items: center; gap: 6px; }
-      #volume { width: 70px; }
-
+      #progress {
+        flex: 1;
+      }
+      .volume-container {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #volume {
+        width: 70px;
+      }
       .url-bar {
         padding: 12px 16px;
         background: #222;
@@ -142,7 +166,12 @@ export default {
         align-items: center;
         border-top: 1px solid #333;
       }
-      .url-bar label { color: #aaa; font-size: 13px; font-weight: 600; white-space: nowrap; }
+      .url-bar label {
+        color: #aaa;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
       .url-bar input[type="text"] {
         flex: 1;
         padding: 8px 12px;
@@ -153,7 +182,9 @@ export default {
         font-size: 14px;
         outline: none;
       }
-      .url-bar input[type="text"]:focus { border-color: #1DB954; }
+      .url-bar input[type="text"]:focus {
+        border-color: #1DB954;
+      }
       .url-bar button {
         background: #1DB954;
         color: #fff;
@@ -164,8 +195,9 @@ export default {
         cursor: pointer;
         font-size: 14px;
       }
-      .url-bar button:hover { background: #1ed760; }
-
+      .url-bar button:hover {
+        background: #1ed760;
+      }
       .empty-message {
         color: #aaa;
         font-size: 18px;
@@ -178,25 +210,35 @@ export default {
         align-items: center;
         gap: 12px;
       }
-      .empty-message span { font-size: 48px; }
+      .empty-message span {
+        font-size: 48px;
+      }
 
-      /* Embed mode */
-      .embed-mode .url-bar { display: none !important; }
-      .embed-mode .main-container { border-radius: 0; box-shadow: none; }
-      body.embed-mode { padding: 0; background: #000; }
+      /* ===== Embed mode: hide URL bar ===== */
+      .embed-mode .url-bar {
+        display: none !important;
+      }
+      .embed-mode .main-container {
+        border-radius: 0;
+        box-shadow: none;
+      }
+      body.embed-mode {
+        padding: 0;
+        background: #000;
+      }
     </style>
 </head>
 <body class="__BODY_CLASS__">
   <div class="main-container">
     <div class="player-wrapper">
       <video id="video" src="__VIDEO_URL__"></video>
-    </div>
-    <div class="controls">
-      <button id="play-btn">▶</button>
-      <input type="range" id="progress" min="0" max="100" value="0" />
-      <div class="volume-container">
-        <button id="mute-btn">🔊</button>
-        <input type="range" id="volume" min="0" max="1" step="0.1" value="1" />
+      <div class="controls">
+        <button id="play-btn">▶</button>
+        <input type="range" id="progress" min="0" max="100" value="0" />
+        <div class="volume-container">
+          <button id="mute-btn">🔊</button>
+          <input type="range" id="volume" min="0" max="1" step="0.1" value="1" />
+        </div>
       </div>
     </div>
     <div id="emptyState" class="empty-message" style="display: __EMPTY_DISPLAY__;">
@@ -211,7 +253,15 @@ export default {
     </div>
   </div>
   <script>
-    // ===== JavaScript =====
+    // (same JS as before, but now emptyState is separate)
+    function encodeUrl(url) {
+      return btoa(url).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+    }
+    function decodeUrl(hash) {
+      let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
+      while (base64.length % 4) base64 += '=';
+      return atob(base64);
+    }
     const video = document.getElementById('video');
     const playBtn = document.getElementById('play-btn');
     const muteBtn = document.getElementById('mute-btn');
@@ -241,8 +291,6 @@ export default {
       if (video.muted) { video.muted = false; muteBtn.textContent = '🔊'; volume.value = video.volume; }
       else { video.muted = true; muteBtn.textContent = '🔇'; volume.value = 0; }
     }
-
-    // Load video and update URL
     function loadVideo() {
       let newUrl = urlInput.value.trim();
       if (!newUrl) return;
@@ -251,13 +299,11 @@ export default {
       video.play();
       playBtn.textContent = '⏸';
       emptyState.style.display = 'none';
-      // Encode and push state
-      const hash = btoa(newUrl).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+      const hash = encodeUrl(newUrl);
       const cleanPath = '/watch/' + hash;
       window.history.pushState({}, '', cleanPath);
       document.title = newUrl.split('/').pop() || 'Video Player';
     }
-
     playBtn.addEventListener('click', togglePlay);
     video.addEventListener('click', togglePlay);
     video.addEventListener('timeupdate', updateProgress);
@@ -267,16 +313,13 @@ export default {
     loadBtn.addEventListener('click', loadVideo);
     urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
 
-    // On load: decode hash if present
     (function init() {
       const path = window.location.pathname;
       if (path.startsWith('/watch/')) {
         const hash = path.split('/watch/')[1];
         if (hash) {
           try {
-            let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
-            while (base64.length % 4) base64 += '=';
-            const decoded = atob(base64);
+            const decoded = decodeUrl(hash);
             if (decoded) {
               video.src = decoded;
               video.load();
@@ -286,10 +329,7 @@ export default {
               urlInput.value = decoded;
               document.title = decoded.split('/').pop() || 'Video Player';
             }
-          } catch (e) {
-            console.error('Decoding error:', e);
-            emptyState.style.display = 'block';
-          }
+          } catch {}
         }
       } else if (!video.src || video.src === '') {
         emptyState.style.display = 'block';
@@ -311,7 +351,10 @@ export default {
       .replace(/__BODY_CLASS__/g, bodyClass);
 
     return new Response(html, {
-      headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      headers: {
+        'Content-Type': 'text/html',
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+      }
     });
   }
 };
