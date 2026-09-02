@@ -3,26 +3,26 @@ export default {
     const url = new URL(request.url);
     const baseUrl = url.origin;
 
-    // ----- oEmbed endpoint (type changed to "rich") -----
+    // ----- oEmbed endpoint (type: rich, no video hints) -----
     if (url.pathname === '/oembed') {
       const requestedUrl = url.searchParams.get('url') || '';
       const params = new URL(requestedUrl).searchParams;
       const videoUrl = params.get('video') || '';
 
-      // Build the iframe that will be embedded
       const iframeSrc = `${baseUrl}/?video=${encodeURIComponent(videoUrl)}`;
       const iframeHtml = `<iframe src="${iframeSrc}" width="640" height="400" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
 
       return new Response(JSON.stringify({
         version: '1.0',
-        type: 'rich',          // <-- CHANGE HERE: was "video"
+        type: 'rich',                // Essential: forces iframe, not native video
         provider_name: 'MyPlayer',
         provider_url: baseUrl,
         title: videoUrl ? videoUrl.split('/').pop() : 'Video Player',
         html: iframeHtml,
         width: 640,
         height: 400,
-        thumbnail_url: 'https://via.placeholder.com/640x360/1DB954/000000?text=MyPlayer',
+        // Thumbnail is just a static placeholder (no .mp4 hint)
+        thumbnail_url: 'https://via.placeholder.com/640x360/1DB954/000000?text=Video',
         thumbnail_width: 640,
         thumbnail_height: 360
       }), {
@@ -33,32 +33,30 @@ export default {
       });
     }
 
-    // ----- Main player page (unchanged from previous version) -----
+    // ----- Main player page -----
     const videoUrl = url.searchParams.get('video') || '';
-    const thumbnail = url.searchParams.get('thumb') || 'https://via.placeholder.com/640x360/1DB954/000000?text=MyPlayer';
+    const thumbnail = url.searchParams.get('thumb') || 'https://via.placeholder.com/640x360/1DB954/000000?text=Video';
     const title = videoUrl ? videoUrl.split('/').pop() : 'My Video Player';
 
-    // (the rest of the HTML template is the same as before, so I'll omit it for brevity)
-    // But you must include the full HTML template as in the previous answer.
-    // I'll put it back here for completeness...
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>__TITLE__</title>
+
+    <!-- ONLY SOCIAL TAGS – no og:video, no video hints -->
     <meta property="og:title" content="__TITLE__" />
     <meta property="og:description" content="Watch this video on MyPlayer" />
-    <meta property="og:video" content="__VIDEO_URL__" />
-    <meta property="og:video:type" content="video/mp4" />
-    <meta property="og:video:width" content="640" />
-    <meta property="og:video:height" content="360" />
     <meta property="og:image" content="__THUMBNAIL__" />
     <meta property="og:url" content="__PAGE_URL__" />
-    <meta property="og:type" content="video.other" />
+    <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- oEmbed discovery link (unchanged) -->
     <link rel="alternate" type="application/json+oembed" 
           href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
+
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
@@ -229,7 +227,7 @@ export default {
     const emptyState = document.getElementById('emptyState');
 
     function togglePlay() {
-      if (video.paused) { video.play(); playBtn.textContent = '⏸'; } 
+      if (video.paused) { video.play(); playBtn.textContent = '⏸'; }
       else { video.pause(); playBtn.textContent = '▶'; }
     }
     function updateProgress() {
@@ -245,7 +243,7 @@ export default {
       muteBtn.textContent = video.volume === 0 ? '🔇' : '🔊';
     }
     function toggleMute() {
-      if (video.muted) { video.muted = false; muteBtn.textContent = '🔊'; volume.value = video.volume; } 
+      if (video.muted) { video.muted = false; muteBtn.textContent = '🔊'; volume.value = video.volume; }
       else { video.muted = true; muteBtn.textContent = '🔇'; volume.value = 0; }
     }
     function loadVideo() {
