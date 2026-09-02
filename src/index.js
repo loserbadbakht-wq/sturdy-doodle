@@ -3,16 +3,19 @@ export default {
     const url = new URL(request.url);
     const baseUrl = url.origin;
 
-    // ----- oEmbed endpoint (unchanged) -----
+    // ----- oEmbed endpoint (type changed to "rich") -----
     if (url.pathname === '/oembed') {
       const requestedUrl = url.searchParams.get('url') || '';
       const params = new URL(requestedUrl).searchParams;
       const videoUrl = params.get('video') || '';
+
+      // Build the iframe that will be embedded
       const iframeSrc = `${baseUrl}/?video=${encodeURIComponent(videoUrl)}`;
       const iframeHtml = `<iframe src="${iframeSrc}" width="640" height="400" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+
       return new Response(JSON.stringify({
         version: '1.0',
-        type: 'video',
+        type: 'rich',          // <-- CHANGE HERE: was "video"
         provider_name: 'MyPlayer',
         provider_url: baseUrl,
         title: videoUrl ? videoUrl.split('/').pop() : 'Video Player',
@@ -30,11 +33,14 @@ export default {
       });
     }
 
-    // ----- Main player page -----
+    // ----- Main player page (unchanged from previous version) -----
     const videoUrl = url.searchParams.get('video') || '';
     const thumbnail = url.searchParams.get('thumb') || 'https://via.placeholder.com/640x360/1DB954/000000?text=MyPlayer';
     const title = videoUrl ? videoUrl.split('/').pop() : 'My Video Player';
 
+    // (the rest of the HTML template is the same as before, so I'll omit it for brevity)
+    // But you must include the full HTML template as in the previous answer.
+    // I'll put it back here for completeness...
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -72,11 +78,9 @@ export default {
         overflow: hidden;
         box-shadow: 0 10px 30px rgba(0,0,0,0.8);
       }
-      /* ---- Player area ---- */
       .player-wrapper {
         position: relative;
         background: #000;
-        /* Maintain 16:9 aspect ratio even without video */
         aspect-ratio: 16 / 9;
         display: flex;
         align-items: center;
@@ -89,7 +93,6 @@ export default {
         object-fit: contain;
         background: #000;
       }
-      /* Controls overlay (same as before) */
       .controls {
         position: absolute;
         bottom: 0;
@@ -130,7 +133,6 @@ export default {
       #volume {
         width: 70px;
       }
-      /* ---- URL bar (separate, below the player) ---- */
       .url-bar {
         padding: 14px 16px;
         background: #222;
@@ -173,7 +175,6 @@ export default {
       .url-bar button:hover {
         background: #1ed760;
       }
-      /* ---- Empty state message (centered over video) ---- */
       .empty-message {
         color: #aaa;
         font-size: 18px;
@@ -195,7 +196,6 @@ export default {
 </head>
 <body>
   <div class="main-container">
-    <!-- Player area -->
     <div class="player-wrapper">
       <video id="video" src="__VIDEO_URL__"></video>
       <div class="controls">
@@ -206,22 +206,18 @@ export default {
           <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
         </div>
       </div>
-      <!-- Empty state (hidden if video src exists) -->
       <div id="emptyState" class="empty-message" style="display: __EMPTY_DISPLAY__; position: absolute; top:0; left:0; right:0; bottom:0; background: #111;">
         <span>🎬</span>
         <div>No video loaded</div>
         <div style="font-size:14px; color:#666;">Paste a URL below and click "Load"</div>
       </div>
     </div>
-
-    <!-- URL bar (always visible below) -->
     <div class="url-bar">
       <label>🔗 Video URL</label>
       <input type="text" id="videoUrlInput" placeholder="https://example.com/video.mp4" value="__VIDEO_URL__">
       <button id="load-btn">Load</button>
     </div>
   </div>
-
   <script>
     const video = document.getElementById('video');
     const playBtn = document.getElementById('play-btn');
@@ -232,49 +228,26 @@ export default {
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
 
-    // Toggle play/pause
     function togglePlay() {
-      if (video.paused) {
-        video.play();
-        playBtn.textContent = '⏸';
-      } else {
-        video.pause();
-        playBtn.textContent = '▶';
-      }
+      if (video.paused) { video.play(); playBtn.textContent = '⏸'; } 
+      else { video.pause(); playBtn.textContent = '▶'; }
     }
-
-    // Update progress bar
     function updateProgress() {
       const percentage = (video.currentTime / video.duration) * 100;
       progress.value = percentage || 0;
     }
-
-    // Seek via progress bar
     function setProgress() {
       const time = (progress.value * video.duration) / 100;
       video.currentTime = time;
     }
-
-    // Volume control
     function handleVolume() {
       video.volume = volume.value;
       muteBtn.textContent = video.volume === 0 ? '🔇' : '🔊';
     }
-
-    // Toggle mute
     function toggleMute() {
-      if (video.muted) {
-        video.muted = false;
-        muteBtn.textContent = '🔊';
-        volume.value = video.volume;
-      } else {
-        video.muted = true;
-        muteBtn.textContent = '🔇';
-        volume.value = 0;
-      }
+      if (video.muted) { video.muted = false; muteBtn.textContent = '🔊'; volume.value = video.volume; } 
+      else { video.muted = true; muteBtn.textContent = '🔇'; volume.value = 0; }
     }
-
-    // Load new video from input
     function loadVideo() {
       let newUrl = urlInput.value.trim();
       if (!newUrl) return;
@@ -282,16 +255,11 @@ export default {
       video.load();
       video.play();
       playBtn.textContent = '⏸';
-      // Hide empty state
       emptyState.style.display = 'none';
-      // Update URL without reload
       const params = new URLSearchParams(window.location.search);
       params.set('video', newUrl);
-      const newPath = window.location.pathname + '?' + params.toString();
-      window.history.pushState({}, '', newPath);
+      window.history.pushState({}, '', window.location.pathname + '?' + params.toString());
     }
-
-    // Event listeners
     playBtn.addEventListener('click', togglePlay);
     video.addEventListener('click', togglePlay);
     video.addEventListener('timeupdate', updateProgress);
@@ -300,11 +268,8 @@ export default {
     muteBtn.addEventListener('click', toggleMute);
     loadBtn.addEventListener('click', loadVideo);
     urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
-
-    // If no video src, show empty state and hide controls?
     if (!video.src || video.src === '') {
       emptyState.style.display = 'flex';
-      // Controls are still there but we can keep them hidden by default
     } else {
       emptyState.style.display = 'none';
     }
