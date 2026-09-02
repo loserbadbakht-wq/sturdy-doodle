@@ -18,7 +18,7 @@ export default {
     const baseUrl = url.origin;
     const isEmbed = url.searchParams.get('embed') === '1';
 
-    // ----- oEmbed endpoint (unchanged) -----
+    // ----- oEmbed endpoint -----
     if (url.pathname === '/oembed') {
       const requestedUrl = url.searchParams.get('url') || '';
       let hash = '';
@@ -29,8 +29,10 @@ export default {
         }
       } catch {}
       const videoUrl = hash ? decodeUrl(hash) : '';
+
       const iframeSrc = `${baseUrl}/watch/${hash}?embed=1`;
       const iframeHtml = `<iframe src="${iframeSrc}" width="640" height="400" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+
       return new Response(JSON.stringify({
         version: '1.0',
         type: 'rich',
@@ -54,12 +56,18 @@ export default {
     // ----- Main player page -----
     let videoUrl = '';
     let hash = '';
+
     if (url.pathname.startsWith('/watch/')) {
       hash = url.pathname.split('/watch/')[1];
       if (hash) {
-        try { videoUrl = decodeUrl(hash); } catch {}
+        try {
+          videoUrl = decodeUrl(hash);
+        } catch {
+          videoUrl = '';
+        }
       }
     }
+
     if (!videoUrl) {
       const direct = url.searchParams.get('video');
       if (direct) videoUrl = direct;
@@ -73,8 +81,8 @@ export default {
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>__TITLE__</title>
 
     <meta property="og:title" content="__TITLE__" />
@@ -106,33 +114,38 @@ export default {
         overflow: hidden;
         box-shadow: 0 10px 30px rgba(0,0,0,0.8);
       }
-      /* ===== Video wrapper – simple, no absolute positioning ===== */
+      /* ===== Video wrapper – no fixed aspect ratio, expands to video ===== */
       .player-wrapper {
+        position: relative;
         width: 100%;
         background: #000;
         display: flex;
-        flex-direction: column;
-        align-items: center;
         justify-content: center;
+        align-items: center;
       }
       .player-wrapper video {
         width: 100%;
-        height: auto;
+        height: auto;        /* maintains aspect ratio */
         display: block;
         background: #000;
-        /* if you want to force aspect ratio, use this: */
-        /* aspect-ratio: 16 / 9; */
-        /* object-fit: contain; */
       }
-      /* ===== Controls positioned below video ===== */
+      /* Controls overlay – positioned absolutely over the video */
       .controls {
-        width: 100%;
-        background: rgba(0, 0, 0, 0.8);
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.7);
         display: flex;
         align-items: center;
-        padding: 8px 12px;
-        gap: 12px;
-        border-top: 1px solid #333;
+        padding: 10px 15px;
+        gap: 15px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        z-index: 2;
+      }
+      .player-wrapper:hover .controls {
+        opacity: 1;
       }
       button {
         background: none;
@@ -140,11 +153,11 @@ export default {
         color: #fff;
         font-size: 18px;
         cursor: pointer;
-        padding: 4px 8px;
+        padding: 5px 8px;
       }
       input[type="range"] {
         cursor: pointer;
-        accent-color: #1DB954;
+        accent-color: #ffffff;
         background: transparent;
       }
       #progress {
@@ -153,34 +166,35 @@ export default {
       .volume-container {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
       }
       #volume {
         width: 70px;
       }
       .url-bar {
-        padding: 12px 16px;
+        padding: 14px 16px;
         background: #222;
         display: flex;
-        gap: 10px;
+        gap: 12px;
         align-items: center;
         border-top: 1px solid #333;
       }
       .url-bar label {
         color: #aaa;
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 600;
         white-space: nowrap;
       }
       .url-bar input[type="text"] {
         flex: 1;
-        padding: 8px 12px;
+        padding: 10px 14px;
         border: 1px solid #444;
-        border-radius: 4px;
+        border-radius: 6px;
         background: #111;
         color: #fff;
         font-size: 14px;
         outline: none;
+        transition: border 0.2s;
       }
       .url-bar input[type="text"]:focus {
         border-color: #1DB954;
@@ -188,27 +202,33 @@ export default {
       .url-bar button {
         background: #1DB954;
         color: #fff;
-        padding: 8px 18px;
-        border-radius: 4px;
+        padding: 10px 24px;
+        border-radius: 6px;
         font-weight: bold;
         border: none;
         cursor: pointer;
         font-size: 14px;
+        transition: background 0.2s;
       }
       .url-bar button:hover {
         background: #1ed760;
       }
       .empty-message {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #111;
         color: #aaa;
         font-size: 18px;
         text-align: center;
-        padding: 40px;
-        background: #111;
-        width: 100%;
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: center;
         gap: 12px;
+        z-index: 1;
       }
       .empty-message span {
         font-size: 48px;
@@ -234,26 +254,26 @@ export default {
       <video id="video" src="__VIDEO_URL__"></video>
       <div class="controls">
         <button id="play-btn">▶</button>
-        <input type="range" id="progress" min="0" max="100" value="0" />
+        <input type="range" id="progress" min="0" max="100" value="0">
         <div class="volume-container">
           <button id="mute-btn">🔊</button>
-          <input type="range" id="volume" min="0" max="1" step="0.1" value="1" />
+          <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
         </div>
       </div>
-    </div>
-    <div id="emptyState" class="empty-message" style="display: __EMPTY_DISPLAY__;">
-      <span>🎬</span>
-      <div>No video loaded</div>
-      <div style="font-size:14px; color:#666;">Paste a URL below and click "Load"</div>
+      <div id="emptyState" class="empty-message" style="display: __EMPTY_DISPLAY__;">
+        <span>🎬</span>
+        <div>No video loaded</div>
+        <div style="font-size:14px; color:#666;">Paste a URL below and click "Load"</div>
+      </div>
     </div>
     <div class="url-bar">
       <label>🔗 Video URL</label>
-      <input type="text" id="videoUrlInput" placeholder="https://example.com/video.mp4" value="__VIDEO_URL__" />
+      <input type="text" id="videoUrlInput" placeholder="https://example.com/video.mp4" value="__VIDEO_URL__">
       <button id="load-btn">Load</button>
     </div>
   </div>
   <script>
-    // (same JS as before, but now emptyState is separate)
+    // (Same JavaScript as before – unchanged)
     function encodeUrl(url) {
       return btoa(url).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
     }
@@ -332,7 +352,7 @@ export default {
           } catch {}
         }
       } else if (!video.src || video.src === '') {
-        emptyState.style.display = 'block';
+        emptyState.style.display = 'flex';
       }
     })();
   </script>
@@ -347,7 +367,7 @@ export default {
       .replace(/__PAGE_URL__/g, pageUrl)
       .replace(/__ENCODED_PAGE_URL__/g, encodeURIComponent(oembedPageUrl))
       .replace(/__BASE_URL__/g, baseUrl)
-      .replace(/__EMPTY_DISPLAY__/g, videoUrl ? 'none' : 'block')
+      .replace(/__EMPTY_DISPLAY__/g, videoUrl ? 'none' : 'flex')
       .replace(/__BODY_CLASS__/g, bodyClass);
 
     return new Response(html, {
