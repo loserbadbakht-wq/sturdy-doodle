@@ -114,23 +114,20 @@ export default {
         overflow: hidden;
         box-shadow: 0 10px 30px rgba(0,0,0,0.8);
       }
-      /* ===== Video wrapper with 16:9 aspect ratio ===== */
+      /* ===== Video wrapper – no fixed aspect ratio, expands to video ===== */
       .player-wrapper {
         position: relative;
         width: 100%;
-        padding-bottom: 56.25%; /* 16:9 */
         background: #000;
-        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
       }
       .player-wrapper video {
-        position: absolute;
-        top: 0;
-        left: 0;
         width: 100%;
-        height: 100%;
-        object-fit: contain;  /* ensures the whole video is visible */
-        background: #000;
+        height: auto;        /* maintains aspect ratio */
         display: block;
+        background: #000;
       }
       /* Controls overlay – positioned absolutely over the video */
       .controls {
@@ -276,7 +273,7 @@ export default {
     </div>
   </div>
   <script>
-    // (same JavaScript as before – unchanged)
+    // (Same JavaScript as before – unchanged)
     function encodeUrl(url) {
       return btoa(url).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
     }
