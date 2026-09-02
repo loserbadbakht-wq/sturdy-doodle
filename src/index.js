@@ -1,6 +1,5 @@
 // ===== Helper: encode/decode URL to/from base64url =====
 function encodeUrl(url) {
-  // Convert to base64, then make URL-safe
   return btoa(url)
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -8,9 +7,7 @@ function encodeUrl(url) {
 }
 
 function decodeUrl(hash) {
-  // Convert back from URL-safe base64
   let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
-  // Pad with '=' if needed
   while (base64.length % 4) base64 += '=';
   return atob(base64);
 }
@@ -19,11 +16,11 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const baseUrl = url.origin;
+    const isEmbed = url.searchParams.get('embed') === '1';
 
     // ----- oEmbed endpoint -----
     if (url.pathname === '/oembed') {
       const requestedUrl = url.searchParams.get('url') || '';
-      // Extract the hash from the path (e.g., /watch/abc123)
       let hash = '';
       try {
         const reqUrl = new URL(requestedUrl);
@@ -33,7 +30,8 @@ export default {
       } catch {}
       const videoUrl = hash ? decodeUrl(hash) : '';
 
-      const iframeSrc = `${baseUrl}/watch/${hash}`;
+      // The iframe src should include embed=1 to hide the URL bar
+      const iframeSrc = `${baseUrl}/watch/${hash}?embed=1`;
       const iframeHtml = `<iframe src="${iframeSrc}" width="640" height="400" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
 
       return new Response(JSON.stringify({
@@ -77,15 +75,16 @@ export default {
       const direct = url.searchParams.get('video');
       if (direct) {
         videoUrl = direct;
-        // If we have a direct URL, we could redirect to /watch/encoded, but we'll let JS handle it.
       }
     }
 
     const title = videoUrl ? videoUrl.split('/').pop() : 'My Video Player';
     const thumbnail = url.searchParams.get('thumb') || 'https://via.placeholder.com/640x360/1DB954/000000?text=Video';
 
-    // Build the page URL for og:url (use the clean /watch/ version if possible)
+    // Page URL for og:url (use clean /watch/ hash version)
     const pageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
+    // For oEmbed discovery, we need the page URL without embed=1 (or include it? We'll include)
+    const oembedPageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
 
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
@@ -107,7 +106,6 @@ export default {
           href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
 
     <style>
-      /* (your styles – same as before) */
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
         background-color: #141414;
@@ -133,12 +131,13 @@ export default {
         display: flex;
         align-items: center;
         justify-content: center;
+        overflow: hidden;
       }
       .player-wrapper video {
         width: 100%;
         height: 100%;
         display: block;
-        object-fit: contain;
+        object-fit: contain; /* ensures video scales without cropping */
         background: #000;
       }
       .controls {
@@ -157,6 +156,7 @@ export default {
       .player-wrapper:hover .controls {
         opacity: 1;
       }
+      /* In embed mode, show controls always? Actually we keep hover behavior */
       button {
         background: none;
         border: none;
@@ -240,9 +240,22 @@ export default {
       .empty-message span {
         font-size: 48px;
       }
+
+      /* ===== HIDE URL BAR IN EMBED MODE ===== */
+      .embed-mode .url-bar {
+        display: none !important;
+      }
+      .embed-mode .main-container {
+        border-radius: 0; /* remove rounded corners when embedded */
+        box-shadow: none;
+      }
+      body.embed-mode {
+        padding: 0;
+        background: #000;
+      }
     </style>
 </head>
-<body>
+<body class="__BODY_CLASS__">
   <div class="main-container">
     <div class="player-wrapper">
       <video id="video" src="__VIDEO_URL__"></video>
@@ -291,7 +304,7 @@ export default {
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
 
-    // ===== Player functions (unchanged) =====
+    // ===== Player functions =====
     function togglePlay() {
       if (video.paused) { video.play(); playBtn.textContent = '⏸'; }
       else { video.pause(); playBtn.textContent = '▶'; }
@@ -318,19 +331,15 @@ export default {
       let newUrl = urlInput.value.trim();
       if (!newUrl) return;
 
-      // Set video source
       video.src = newUrl;
       video.load();
       video.play();
       playBtn.textContent = '⏸';
       emptyState.style.display = 'none';
 
-      // Encode the URL and build clean /watch/ hash link
       const hash = encodeUrl(newUrl);
       const cleanPath = '/watch/' + hash;
-      // Update browser URL without reload
       window.history.pushState({}, '', cleanPath);
-      // Also update the page title (optional)
       document.title = newUrl.split('/').pop() || 'Video Player';
     }
 
@@ -344,7 +353,7 @@ export default {
     loadBtn.addEventListener('click', loadVideo);
     urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
 
-    // ===== On page load, if we have a hash in the path, decode and set video =====
+    // ===== On page load, decode hash if present =====
     (function init() {
       const path = window.location.pathname;
       if (path.startsWith('/watch/')) {
@@ -371,15 +380,19 @@ export default {
 </body>
 </html>`;
 
+    // Determine body class: if embed mode, add 'embed-mode'
+    const bodyClass = isEmbed ? 'embed-mode' : '';
+
     // Replace placeholders
     let html = htmlTemplate
       .replace(/__VIDEO_URL__/g, videoUrl.replace(/"/g, '&quot;'))
       .replace(/__TITLE__/g, title.replace(/"/g, '&quot;'))
       .replace(/__THUMBNAIL__/g, thumbnail)
       .replace(/__PAGE_URL__/g, pageUrl)
-      .replace(/__ENCODED_PAGE_URL__/g, encodeURIComponent(pageUrl))
+      .replace(/__ENCODED_PAGE_URL__/g, encodeURIComponent(oembedPageUrl))
       .replace(/__BASE_URL__/g, baseUrl)
-      .replace(/__EMPTY_DISPLAY__/g, videoUrl ? 'none' : 'flex');
+      .replace(/__EMPTY_DISPLAY__/g, videoUrl ? 'none' : 'flex')
+      .replace(/__BODY_CLASS__/g, bodyClass);
 
     return new Response(html, {
       headers: {
