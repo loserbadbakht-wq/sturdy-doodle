@@ -30,7 +30,6 @@ export default {
       } catch {}
       const videoUrl = hash ? decodeUrl(hash) : '';
 
-      // The iframe src should include embed=1 to hide the URL bar
       const iframeSrc = `${baseUrl}/watch/${hash}?embed=1`;
       const iframeHtml = `<iframe src="${iframeSrc}" width="100%" height="190" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
 
@@ -58,7 +57,6 @@ export default {
     let videoUrl = '';
     let hash = '';
 
-    // Try to get video from /watch/:hash
     if (url.pathname.startsWith('/watch/')) {
       hash = url.pathname.split('/watch/')[1];
       if (hash) {
@@ -70,7 +68,6 @@ export default {
       }
     }
 
-    // Fallback: ?video=... (for direct testing)
     if (!videoUrl) {
       const direct = url.searchParams.get('video');
       if (direct) {
@@ -80,10 +77,7 @@ export default {
 
     const title = videoUrl ? videoUrl.split('/').pop() : 'My Video Player';
     const thumbnail = url.searchParams.get('thumb') || 'https://via.placeholder.com/640x360/1DB954/000000?text=Video';
-
-    // Page URL for og:url (use clean /watch/ hash version)
     const pageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
-    // For oEmbed discovery, we need the page URL without embed=1 (or include it? We'll include)
     const oembedPageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
 
     const htmlTemplate = `<!DOCTYPE html>
@@ -93,7 +87,6 @@ export default {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>__TITLE__</title>
 
-    <!-- SOCIAL TAGS (no video hints) -->
     <meta property="og:title" content="__TITLE__" />
     <meta property="og:description" content="Watch this video on MyPlayer" />
     <meta property="og:image" content="__THUMBNAIL__" />
@@ -101,7 +94,6 @@ export default {
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
 
-    <!-- oEmbed discovery -->
     <link rel="alternate" type="application/json+oembed" 
           href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
 
@@ -137,9 +129,11 @@ export default {
         width: 100%;
         height: 100%;
         display: block;
-        object-fit: contain; /* ensures video scales without cropping */
+        object-fit: contain;
         background: #000;
       }
+
+      /* Controls – hidden by default, shown via JS class */
       .controls {
         position: absolute;
         bottom: 0;
@@ -148,30 +142,85 @@ export default {
         background: rgba(0, 0, 0, 0.7);
         display: flex;
         align-items: center;
-        padding: 8px 12px;  /* reduced padding */
-        gap: 10px;          /* smaller gap */
+        padding: 8px 12px;
+        gap: 10px;
         opacity: 0;
         transition: opacity 0.3s ease;
+        pointer-events: none;  /* so clicks pass through when hidden */
       }
-      .player-wrapper:hover .controls {
+      .controls.controls-show {
         opacity: 1;
+        pointer-events: auto;
       }
+
+      /* Progress bar container – for loading fill */
+      .progress-container {
+        flex: 1;
+        position: relative;
+        height: 4px;  /* match input height */
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+      }
+      .progress-loaded {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 2px;
+        pointer-events: none;
+        width: 0%;
+        z-index: 1;
+      }
+      .progress-container input[type="range"] {
+        width: 100%;
+        height: 4px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: transparent;
+        position: relative;
+        z-index: 2;
+        cursor: pointer;
+        margin: 0;
+      }
+      .progress-container input[type="range"]::-webkit-slider-track {
+        width: 100%;
+        height: 4px;
+        background: transparent;
+      }
+      .progress-container input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #fff;
+        cursor: pointer;
+        margin-top: -4px;
+        box-shadow: 0 0 4px rgba(0,0,0,0.6);
+      }
+      .progress-container input[type="range"]::-moz-range-track {
+        height: 4px;
+        background: transparent;
+        border: none;
+      }
+      .progress-container input[type="range"]::-moz-range-thumb {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #fff;
+        cursor: pointer;
+        border: none;
+      }
+
       button {
         background: none;
         border: none;
         color: #fff;
-        font-size: 16px;    /* slightly smaller */
+        font-size: 16px;
         cursor: pointer;
-        padding: 4px 6px;   /* reduced */
-      }
-      input[type="range"] {
-        cursor: pointer;
-        accent-color: #ffffff;
-        background: transparent;
-        height: 4px;        /* thinner */
-      }
-      #progress {
-        flex: 1;
+        padding: 4px 6px;
       }
       .volume-container {
         display: flex;
@@ -179,12 +228,14 @@ export default {
         gap: 6px;
       }
       #volume {
-        width: 60px;        /* narrower */
+        width: 60px;
+        accent-color: #ffffff;
+        background: transparent;
+        height: 4px;
       }
 
-      /* ===== URL BAR – now smaller ===== */
       .url-bar {
-        padding: 8px 12px;          /* reduced from 14px 16px */
+        padding: 8px 12px;
         background: #222;
         display: flex;
         gap: 8px;
@@ -193,18 +244,18 @@ export default {
       }
       .url-bar label {
         color: #aaa;
-        font-size: 12px;            /* smaller */
+        font-size: 12px;
         font-weight: 600;
         white-space: nowrap;
       }
       .url-bar input[type="text"] {
         flex: 1;
-        padding: 6px 10px;          /* reduced from 10px 14px */
+        padding: 6px 10px;
         border: 1px solid #444;
         border-radius: 4px;
         background: #111;
         color: #fff;
-        font-size: 13px;            /* smaller */
+        font-size: 13px;
         outline: none;
         transition: border 0.2s;
       }
@@ -214,12 +265,12 @@ export default {
       .url-bar button {
         background: #1DB954;
         color: #fff;
-        padding: 6px 14px;          /* reduced from 10px 24px */
+        padding: 6px 14px;
         border-radius: 4px;
         font-weight: bold;
         border: none;
         cursor: pointer;
-        font-size: 13px;            /* smaller */
+        font-size: 13px;
         transition: background 0.2s;
       }
       .url-bar button:hover {
@@ -244,12 +295,11 @@ export default {
         font-size: 48px;
       }
 
-      /* ===== HIDE URL BAR IN EMBED MODE ===== */
       .embed-mode .url-bar {
         display: none !important;
       }
       .embed-mode .main-container {
-        border-radius: 0; /* remove rounded corners when embedded */
+        border-radius: 0;
         box-shadow: none;
       }
       body.embed-mode {
@@ -262,13 +312,14 @@ export default {
   <div class="main-container">
     <div class="player-wrapper">
       <video id="video" src="__VIDEO_URL__"></video>
-      <div class="controls">
+      <div class="controls" id="controls">
         <button id="play-btn">▶</button>
-        <!-- Skip backward 10s -->
         <button id="skip-back-btn" title="Skip backward 10 seconds">⏪</button>
-        <!-- Skip forward 10s -->
         <button id="skip-forward-btn" title="Skip forward 10 seconds">⏩</button>
-        <input type="range" id="progress" min="0" max="100" value="0">
+        <div class="progress-container">
+          <div class="progress-loaded" id="progress-loaded"></div>
+          <input type="range" id="progress" min="0" max="100" value="0">
+        </div>
         <div class="volume-container">
           <button id="mute-btn">🔊</button>
           <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
@@ -287,7 +338,7 @@ export default {
     </div>
   </div>
   <script>
-    // ===== Client‑side helpers (mirror server) =====
+    // ===== Client‑side helpers =====
     function encodeUrl(url) {
       return btoa(url)
         .replace(/\\+/g, '-')
@@ -303,47 +354,99 @@ export default {
 
     // ===== DOM references =====
     const video = document.getElementById('video');
+    const controls = document.getElementById('controls');
+    const playerWrapper = document.querySelector('.player-wrapper');
     const playBtn = document.getElementById('play-btn');
     const skipBackBtn = document.getElementById('skip-back-btn');
     const skipForwardBtn = document.getElementById('skip-forward-btn');
     const muteBtn = document.getElementById('mute-btn');
     const progress = document.getElementById('progress');
+    const progressLoaded = document.getElementById('progress-loaded');
     const volume = document.getElementById('volume');
     const urlInput = document.getElementById('videoUrlInput');
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
 
+    // ===== Controls visibility =====
+    let hideTimeout;
+
+    function showControls() {
+      controls.classList.add('controls-show');
+      clearTimeout(hideTimeout);
+      hideTimeout = setTimeout(() => {
+        controls.classList.remove('controls-show');
+      }, 3000);
+    }
+
+    function hideControlsImmediately() {
+      controls.classList.remove('controls-show');
+      clearTimeout(hideTimeout);
+    }
+
     // ===== Player functions =====
     function togglePlay() {
-      if (video.paused) { video.play(); playBtn.textContent = '⏸'; }
-      else { video.pause(); playBtn.textContent = '▶'; }
+      if (video.paused) {
+        video.play();
+        playBtn.textContent = '⏸';
+      } else {
+        video.pause();
+        playBtn.textContent = '▶';
+      }
+      showControls();
     }
+
     function updateProgress() {
       const percentage = (video.currentTime / video.duration) * 100;
       progress.value = percentage || 0;
     }
+
     function setProgress() {
       const time = (progress.value * video.duration) / 100;
       video.currentTime = time;
+      showControls();
     }
+
     function handleVolume() {
       video.volume = volume.value;
       muteBtn.textContent = video.volume === 0 ? '🔇' : '🔊';
-    }
-    function toggleMute() {
-      if (video.muted) { video.muted = false; muteBtn.textContent = '🔊'; volume.value = video.volume; }
-      else { video.muted = true; muteBtn.textContent = '🔇'; volume.value = 0; }
+      showControls();
     }
 
-    // ===== Skip functions =====
+    function toggleMute() {
+      if (video.muted) {
+        video.muted = false;
+        muteBtn.textContent = '🔊';
+        volume.value = video.volume;
+      } else {
+        video.muted = true;
+        muteBtn.textContent = '🔇';
+        volume.value = 0;
+      }
+      showControls();
+    }
+
     function skipBack() {
       video.currentTime = Math.max(0, video.currentTime - 10);
+      showControls();
     }
     function skipForward() {
       video.currentTime = Math.min(video.duration, video.currentTime + 10);
+      showControls();
     }
 
-    // ===== Load video: encode and update URL =====
+    // ===== Loading progress =====
+    function updateLoaded() {
+      if (video.duration > 0 && video.buffered.length > 0) {
+        const loaded = video.buffered.end(0);
+        const percent = (loaded / video.duration) * 100;
+        progressLoaded.style.width = Math.min(percent, 100) + '%';
+      }
+    }
+    function resetLoaded() {
+      progressLoaded.style.width = '0%';
+    }
+
+    // ===== Load video =====
     function loadVideo() {
       let newUrl = urlInput.value.trim();
       if (!newUrl) return;
@@ -353,6 +456,8 @@ export default {
       video.play();
       playBtn.textContent = '⏸';
       emptyState.style.display = 'none';
+      resetLoaded();
+      showControls();
 
       const hash = encodeUrl(newUrl);
       const cleanPath = '/watch/' + hash;
@@ -361,18 +466,29 @@ export default {
     }
 
     // ===== Event listeners =====
+    playerWrapper.addEventListener('mouseenter', showControls);
+    playerWrapper.addEventListener('mousemove', showControls);
+    playerWrapper.addEventListener('mouseleave', hideControlsImmediately);
+
+    video.addEventListener('click', () => {
+      togglePlay();
+      showControls();
+    });
+
     playBtn.addEventListener('click', togglePlay);
-    video.addEventListener('click', togglePlay);
-    video.addEventListener('timeupdate', updateProgress);
-    progress.addEventListener('input', setProgress);
-    volume.addEventListener('input', handleVolume);
-    muteBtn.addEventListener('click', toggleMute);
     skipBackBtn.addEventListener('click', skipBack);
     skipForwardBtn.addEventListener('click', skipForward);
+    muteBtn.addEventListener('click', toggleMute);
+    progress.addEventListener('input', setProgress);
+    volume.addEventListener('input', handleVolume);
     loadBtn.addEventListener('click', loadVideo);
     urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
 
-    // ===== On page load, decode hash if present =====
+    video.addEventListener('timeupdate', updateProgress);
+    video.addEventListener('progress', updateLoaded);
+    video.addEventListener('durationchange', resetLoaded);
+
+    // ===== On page load =====
     (function init() {
       const path = window.location.pathname;
       if (path.startsWith('/watch/')) {
@@ -388,6 +504,7 @@ export default {
               emptyState.style.display = 'none';
               urlInput.value = decoded;
               document.title = decoded.split('/').pop() || 'Video Player';
+              showControls();
             }
           } catch {}
         }
@@ -399,10 +516,8 @@ export default {
 </body>
 </html>`;
 
-    // Determine body class: if embed mode, add 'embed-mode'
     const bodyClass = isEmbed ? 'embed-mode' : '';
 
-    // Replace placeholders
     let html = htmlTemplate
       .replace(/__VIDEO_URL__/g, videoUrl.replace(/"/g, '&quot;'))
       .replace(/__TITLE__/g, title.replace(/"/g, '&quot;'))
