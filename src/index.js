@@ -97,11 +97,10 @@ export default {
     <link rel="alternate" type="application/json+oembed" 
           href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
 
-    <!-- Video.js CDN -->
-    <link href="//vjs.zencdn.net/8.23.6/video-js.min.css" rel="stylesheet">
-    <script src="//vjs.zencdn.net/8.23.6/video.min.js"></script>
-
     <style>
+      :root {
+        color-scheme: light;
+      }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
         background-color: #141414;
@@ -111,6 +110,8 @@ export default {
         min-height: 100vh;
         font-family: sans-serif;
         padding: 20px;
+        filter: none !important;
+        mix-blend-mode: normal !important;
       }
       .main-container {
         width: 100%;
@@ -128,11 +129,152 @@ export default {
         align-items: center;
         justify-content: center;
         overflow: hidden;
+        touch-action: none;
       }
-      .video-js {
+      .player-wrapper video {
         width: 100%;
         height: 100%;
+        display: block;
+        object-fit: contain;
+        background: #000;
+        touch-action: none;
       }
+
+      .controls {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        padding: 8px 12px;
+        gap: 10px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+      }
+      .controls.controls-show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      /* ===== FULLY CUSTOM PROGRESS BAR (no range input) ===== */
+      .progress-wrapper {
+        flex: 1;
+        position: relative;
+        height: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        filter: none !important;
+        mix-blend-mode: normal !important;
+      }
+
+      /* Track background */
+      .progress-track {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 4px;
+        background: #333 !important;
+        background-color: #333 !important;
+        border-radius: 2px;
+        pointer-events: none;
+        filter: none !important;
+        mix-blend-mode: normal !important;
+      }
+
+      /* Loaded (buffered) – always white */
+      .progress-loaded {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 4px;
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        border-radius: 2px;
+        pointer-events: none;
+        width: 0%;
+        z-index: 1;
+        transition: width 0.1s ease;
+        filter: none !important;
+        mix-blend-mode: normal !important;
+      }
+
+      /* Played – red */
+      .progress-played {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 4px;
+        background: #ff0000 !important;
+        background-color: #ff0000 !important;
+        border-radius: 2px;
+        pointer-events: none;
+        width: 0%;
+        z-index: 2;
+        transition: width 0.05s linear;
+        filter: none !important;
+        mix-blend-mode: normal !important;
+      }
+
+      /* Custom thumb – fully controlled */
+      .progress-thumb {
+        position: absolute;
+        top: 50%;
+        left: 0%;
+        transform: translate(-50%, -50%);
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        border: 2px solid #ff0000 !important;
+        box-shadow: 0 0 6px rgba(0,0,0,0.6);
+        pointer-events: none;
+        z-index: 4;
+        transition: left 0.05s linear;
+        filter: none !important;
+        mix-blend-mode: normal !important;
+      }
+
+      /* Invisible interaction layer – captures all clicks/drags */
+      .progress-interaction {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 5;
+        cursor: pointer;
+        background: transparent;
+        -webkit-tap-highlight-color: transparent;
+        filter: none !important;
+        mix-blend-mode: normal !important;
+      }
+
+      button {
+        background: none;
+        border: none;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+        padding: 4px 6px;
+      }
+      .volume-container {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #volume {
+        width: 60px;
+        accent-color: #ffffff;
+        background: transparent;
+        height: 4px;
+      }
+
       .url-bar {
         padding: 8px 12px;
         background: #222;
@@ -175,6 +317,25 @@ export default {
       .url-bar button:hover {
         background: #1ed760;
       }
+
+      .empty-message {
+        color: #aaa;
+        font-size: 18px;
+        text-align: center;
+        background: #111;
+        padding: 40px;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .empty-message span {
+        font-size: 48px;
+      }
+
       .embed-mode .url-bar {
         display: none !important;
       }
@@ -191,22 +352,31 @@ export default {
 <body class="__BODY_CLASS__">
   <div class="main-container">
     <div class="player-wrapper">
-      <video
-        id="my-player"
-        class="video-js"
-        controls
-        preload="auto"
-        poster="__THUMBNAIL__"
-        data-setup='{}'>
-        <source src="__VIDEO_URL__" type="__VIDEO_TYPE__"></source>
-        <p class="vjs-no-js">
-          To view this video please enable JavaScript, and consider upgrading to a
-          web browser that
-          <a href="https://videojs.com/html5-video-support/" target="_blank">
-            supports HTML5 video
-          </a>
-        </p>
-      </video>
+      <video id="video" src="__VIDEO_URL__"></video>
+      <div class="controls" id="controls">
+        <button id="play-btn">▶</button>
+        <button id="skip-back-btn" title="Skip backward 10 seconds">⏪</button>
+        <button id="skip-forward-btn" title="Skip forward 10 seconds">⏩</button>
+        
+        <!-- ===== CUSTOM PROGRESS BAR ===== -->
+        <div class="progress-wrapper" id="progressWrapper">
+          <div class="progress-track" id="progressTrack"></div>
+          <div class="progress-loaded" id="progressLoaded"></div>
+          <div class="progress-played" id="progressPlayed"></div>
+          <div class="progress-thumb" id="progressThumb"></div>
+          <div class="progress-interaction" id="progressInteraction"></div>
+        </div>
+        
+        <div class="volume-container">
+          <button id="mute-btn">🔊</button>
+          <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
+        </div>
+      </div>
+      <div id="emptyState" class="empty-message" style="display: __EMPTY_DISPLAY__; position: absolute; top:0; left:0; right:0; bottom:0; background: #111;">
+        <span>🎬</span>
+        <div>No video loaded</div>
+        <div style="font-size:14px; color:#666;">Paste a URL below and click "Load"</div>
+      </div>
     </div>
     <div class="url-bar">
       <label>🔗 Video URL</label>
@@ -214,9 +384,8 @@ export default {
       <button id="load-btn">Load</button>
     </div>
   </div>
-
   <script>
-    // ===== Helper functions =====
+    // ===== Helpers =====
     function encodeUrl(url) {
       return btoa(url)
         .replace(/\\+/g, '-')
@@ -224,103 +393,287 @@ export default {
         .replace(/=+$/, '');
     }
 
-    // ===== Video.js player initialization =====
-    let player = videojs('my-player', {
-      fluid: true,
-      playbackRates: [0.5, 1, 1.5, 2],
-      controlBar: {
-        skipButtons: {
-          forward: 10,
-          backward: 10
-        }
-      }
-    });
+    function decodeUrl(hash) {
+      let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
+      while (base64.length % 4) base64 += '=';
+      return atob(base64);
+    }
 
-    // ===== URL loading =====
+    // ===== DOM references =====
+    const video = document.getElementById('video');
+    const controls = document.getElementById('controls');
+    const playerWrapper = document.querySelector('.player-wrapper');
+    const playBtn = document.getElementById('play-btn');
+    const skipBackBtn = document.getElementById('skip-back-btn');
+    const skipForwardBtn = document.getElementById('skip-forward-btn');
+    const muteBtn = document.getElementById('mute-btn');
+    const progressLoaded = document.getElementById('progressLoaded');
+    const progressPlayed = document.getElementById('progressPlayed');
+    const progressThumb = document.getElementById('progressThumb');
+    const progressWrapper = document.getElementById('progressWrapper');
+    const progressInteraction = document.getElementById('progressInteraction');
+    const volume = document.getElementById('volume');
     const urlInput = document.getElementById('videoUrlInput');
     const loadBtn = document.getElementById('load-btn');
+    const emptyState = document.getElementById('emptyState');
 
+    // ===== Progress bar interaction (custom drag) =====
+    let isDragging = false;
+
+    function getPercentFromEvent(e) {
+      const rect = progressWrapper.getBoundingClientRect();
+      const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+      const x = clientX - rect.left;
+      return Math.max(0, Math.min(100, (x / rect.width) * 100));
+    }
+
+    function seekToPercent(percent) {
+      if (video.duration > 0) {
+        const time = (percent * video.duration) / 100;
+        video.currentTime = time;
+        progressPlayed.style.width = percent + '%';
+        progressThumb.style.left = percent + '%';
+      }
+    }
+
+    function handleProgressStart(e) {
+      e.preventDefault();
+      isDragging = true;
+      const percent = getPercentFromEvent(e);
+      seekToPercent(percent);
+      showControls();
+    }
+
+    function handleProgressMove(e) {
+      if (!isDragging) return;
+      e.preventDefault();
+      const percent = getPercentFromEvent(e);
+      seekToPercent(percent);
+      showControls();
+    }
+
+    function handleProgressEnd(e) {
+      isDragging = false;
+      showControls();
+    }
+
+    // Mouse events
+    progressInteraction.addEventListener('mousedown', handleProgressStart);
+    document.addEventListener('mousemove', handleProgressMove);
+    document.addEventListener('mouseup', handleProgressEnd);
+
+    // Touch events
+    progressInteraction.addEventListener('touchstart', handleProgressStart, { passive: false });
+    progressInteraction.addEventListener('touchmove', handleProgressMove, { passive: false });
+    progressInteraction.addEventListener('touchend', handleProgressEnd);
+    progressInteraction.addEventListener('touchcancel', handleProgressEnd);
+
+    // ===== Controls visibility =====
+    let hideTimeout;
+
+    function showControls() {
+      controls.classList.add('controls-show');
+      clearTimeout(hideTimeout);
+      hideTimeout = setTimeout(() => {
+        controls.classList.remove('controls-show');
+      }, 3000);
+    }
+
+    function hideControlsImmediately() {
+      controls.classList.remove('controls-show');
+      clearTimeout(hideTimeout);
+    }
+
+    // Mouse events for player wrapper
+    playerWrapper.addEventListener('mouseenter', showControls);
+    playerWrapper.addEventListener('mousemove', showControls);
+    playerWrapper.addEventListener('mouseleave', hideControlsImmediately);
+
+    // ===== Touch events for video (tap to play/pause, hold to toggle controls) =====
+    let holdTimer = null;
+    let isHeld = false;
+
+    function handleTouchStart(e) {
+      if (e.target.closest('.controls')) return;
+      e.preventDefault();
+      holdTimer = setTimeout(() => {
+        isHeld = true;
+        if (controls.classList.contains('controls-show')) {
+          hideControlsImmediately();
+        } else {
+          showControls();
+        }
+      }, 400);
+    }
+
+    function handleTouchEnd(e) {
+      if (e.target.closest('.controls')) {
+        clearTimeout(holdTimer);
+        isHeld = false;
+        return;
+      }
+      e.preventDefault();
+      clearTimeout(holdTimer);
+      if (!isHeld) {
+        togglePlay();
+        showControls();
+      }
+      isHeld = false;
+    }
+
+    function handleTouchCancel(e) {
+      clearTimeout(holdTimer);
+      isHeld = false;
+    }
+
+    video.addEventListener('touchstart', handleTouchStart, { passive: false });
+    video.addEventListener('touchend', handleTouchEnd, { passive: false });
+    video.addEventListener('touchcancel', handleTouchCancel, { passive: false });
+
+    // ===== Player functions =====
+    function togglePlay() {
+      if (video.paused) {
+        video.play();
+        playBtn.textContent = '⏸';
+      } else {
+        video.pause();
+        playBtn.textContent = '▶';
+      }
+    }
+
+    function updateProgress() {
+      if (video.duration > 0) {
+        const percent = (video.currentTime / video.duration) * 100;
+        progressPlayed.style.width = percent + '%';
+        progressThumb.style.left = percent + '%';
+        updateLoaded();
+      }
+    }
+
+    function updateLoaded() {
+      if (video.duration > 0 && video.buffered.length > 0) {
+        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+        const percent = (bufferedEnd / video.duration) * 100;
+        progressLoaded.style.width = Math.min(percent, 100) + '%';
+      } else {
+        progressLoaded.style.width = '0%';
+      }
+    }
+
+    function handleVolume() {
+      video.volume = volume.value;
+      muteBtn.textContent = video.volume === 0 ? '🔇' : '🔊';
+      showControls();
+    }
+
+    function toggleMute() {
+      if (video.muted) {
+        video.muted = false;
+        muteBtn.textContent = '🔊';
+        volume.value = video.volume;
+      } else {
+        video.muted = true;
+        muteBtn.textContent = '🔇';
+        volume.value = 0;
+      }
+      showControls();
+    }
+
+    function skipBack() {
+      video.currentTime = Math.max(0, video.currentTime - 10);
+      showControls();
+    }
+    function skipForward() {
+      video.currentTime = Math.min(video.duration, video.currentTime + 10);
+      showControls();
+    }
+
+    function resetLoaded() {
+      progressLoaded.style.width = '0%';
+    }
+
+    // ===== Load video =====
     function loadVideo() {
-      const newUrl = urlInput.value.trim();
+      let newUrl = urlInput.value.trim();
       if (!newUrl) return;
 
-      // Update source dynamically
-      player.src({
-        src: newUrl,
-        type: getVideoType(newUrl)
-      });
-      player.poster(''); // Clear poster or set a new one if desired
-      player.play();
+      video.src = newUrl;
+      video.load();
+      video.play();
+      playBtn.textContent = '⏸';
+      emptyState.style.display = 'none';
+      resetLoaded();
+      progressPlayed.style.width = '0%';
+      progressThumb.style.left = '0%';
+      showControls();
 
-      // Update URL hash without reloading
       const hash = encodeUrl(newUrl);
       const cleanPath = '/watch/' + hash;
       window.history.pushState({}, '', cleanPath);
       document.title = newUrl.split('/').pop() || 'Video Player';
     }
 
-    function getVideoType(url) {
-      const ext = url.split('.').pop().toLowerCase();
-      const types = {
-        mp4: 'video/mp4',
-        webm: 'video/webm',
-        ogg: 'video/ogg',
-        ogv: 'video/ogg',
-        m3u8: 'application/x-mpegURL',
-        mpd: 'application/dash+xml'
-      };
-      return types[ext] || 'video/mp4'; // fallback
-    }
-
-    loadBtn.addEventListener('click', loadVideo);
-    urlInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') loadVideo();
+    // ===== Event listeners =====
+    video.addEventListener('click', () => {
+      togglePlay();
+      showControls();
     });
 
-    // Initial source type correction (for server-rendered video)
+    playBtn.addEventListener('click', togglePlay);
+    skipBackBtn.addEventListener('click', skipBack);
+    skipForwardBtn.addEventListener('click', skipForward);
+    muteBtn.addEventListener('click', toggleMute);
+    volume.addEventListener('input', handleVolume);
+    loadBtn.addEventListener('click', loadVideo);
+    urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
+
+    video.addEventListener('timeupdate', updateProgress);
+    video.addEventListener('progress', updateLoaded);
+    video.addEventListener('loadeddata', updateLoaded);
+    video.addEventListener('durationchange', () => {
+      resetLoaded();
+      progressPlayed.style.width = '0%';
+      progressThumb.style.left = '0%';
+    });
+
+    // ===== On page load =====
     (function init() {
-      const initialUrl = urlInput.value.trim();
-      if (initialUrl) {
-        const initialType = getVideoType(initialUrl);
-        // Update the source type if it was set as a placeholder
-        const currentSource = player.currentSource();
-        if (currentSource && currentSource.type !== initialType) {
-          player.src({
-            src: initialUrl,
-            type: initialType
-          });
+      const path = window.location.pathname;
+      if (path.startsWith('/watch/')) {
+        const hash = path.split('/watch/')[1];
+        if (hash) {
+          try {
+            const decoded = decodeUrl(hash);
+            if (decoded) {
+              video.src = decoded;
+              video.load();
+              video.play();
+              playBtn.textContent = '⏸';
+              emptyState.style.display = 'none';
+              urlInput.value = decoded;
+              document.title = decoded.split('/').pop() || 'Video Player';
+              showControls();
+            }
+          } catch {}
         }
+      } else if (!video.src || video.src === '') {
+        emptyState.style.display = 'flex';
       }
     })();
   </script>
 </body>
 </html>`;
 
-    // Determine video type for the initial source
-    const videoType = (() => {
-      if (!videoUrl) return 'video/mp4';
-      const ext = videoUrl.split('.').pop().toLowerCase();
-      const types = {
-        mp4: 'video/mp4',
-        webm: 'video/webm',
-        ogg: 'video/ogg',
-        ogv: 'video/ogg',
-        m3u8: 'application/x-mpegURL',
-        mpd: 'application/dash+xml'
-      };
-      return types[ext] || 'video/mp4';
-    })();
-
     const bodyClass = isEmbed ? 'embed-mode' : '';
 
     let html = htmlTemplate
       .replace(/__VIDEO_URL__/g, videoUrl.replace(/"/g, '&quot;'))
-      .replace(/__VIDEO_TYPE__/g, videoType)
       .replace(/__TITLE__/g, title.replace(/"/g, '&quot;'))
       .replace(/__THUMBNAIL__/g, thumbnail)
       .replace(/__PAGE_URL__/g, pageUrl)
       .replace(/__ENCODED_PAGE_URL__/g, encodeURIComponent(oembedPageUrl))
       .replace(/__BASE_URL__/g, baseUrl)
+      .replace(/__EMPTY_DISPLAY__/g, videoUrl ? 'none' : 'flex')
       .replace(/__BODY_CLASS__/g, bodyClass);
 
     return new Response(html, {
