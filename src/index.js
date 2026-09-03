@@ -85,7 +85,6 @@ export default {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="color-scheme" content="light only">
     <title>__TITLE__</title>
 
     <meta property="og:title" content="__TITLE__" />
@@ -100,7 +99,6 @@ export default {
 
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html { color-scheme: light !important; }
       body {
         background-color: #141414;
         display: flex;
@@ -109,7 +107,6 @@ export default {
         min-height: 100vh;
         font-family: sans-serif;
         padding: 20px;
-        color-scheme: light;
       }
       .main-container {
         width: 100%;
@@ -383,8 +380,9 @@ export default {
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
 
-    // ===== FORCE WHITE on the loading bar =====
+    // ===== DEBUG: Force the loading bar to be visible with a red border =====
     progressLoaded.style.backgroundColor = '#ffffff';
+    progressLoaded.style.border = '2px solid #ff0000';  // RED BORDER so you can see it
 
     // ===== Controls visibility =====
     let hideTimeout;
@@ -474,10 +472,12 @@ export default {
         const percent = (bufferedEnd / video.duration) * 100;
         const width = Math.min(percent, 100) + '%';
         progressLoaded.style.width = width;
-        progressLoaded.style.backgroundColor = '#ffffff'; // FORCE WHITE via inline style
+        progressLoaded.style.backgroundColor = '#ffffff';
+        progressLoaded.style.border = '2px solid #ff0000'; // keep the red border
       } else {
         progressLoaded.style.width = '0%';
         progressLoaded.style.backgroundColor = '#ffffff';
+        progressLoaded.style.border = '2px solid #ff0000';
       }
     }
 
@@ -519,6 +519,7 @@ export default {
     function resetLoaded() {
       progressLoaded.style.width = '0%';
       progressLoaded.style.backgroundColor = '#ffffff';
+      progressLoaded.style.border = '2px solid #ff0000';
     }
 
     // ===== Load video =====
