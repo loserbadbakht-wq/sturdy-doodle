@@ -154,93 +154,107 @@ export default {
         pointer-events: auto;
       }
 
-      /* ---- PROGRESS BAR - FORCE RESET ---- */
-      .progress-container {
+      /* ===== REBUILT PROGRESS BAR FROM SCRATCH ===== */
+      .progress-wrapper {
         flex: 1;
         position: relative;
         height: 4px;
-        background: #222;
-        border-radius: 2px;
         cursor: pointer;
+        display: flex;
+        align-items: center;
       }
+      
+      /* The track background (always visible) */
+      .progress-track {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 4px;
+        background: #333;
+        border-radius: 2px;
+        pointer-events: none;
+      }
+      
+      /* Loaded (buffered) - white */
       .progress-loaded {
         position: absolute;
         left: 0;
         top: 0;
-        height: 100%;
+        height: 4px;
+        background: #ffffff;
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
         z-index: 1;
-        /* background set via JavaScript inline style */
+        transition: width 0.1s ease;
       }
+      
+      /* Played - red */
       .progress-played {
         position: absolute;
         left: 0;
         top: 0;
-        height: 100%;
+        height: 4px;
         background: #ff0000;
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
         z-index: 2;
+        transition: width 0.05s linear;
       }
-
-      /* FORCE RESET of the range input */
-      .progress-container input[type="range"] {
+      
+      /* The invisible range input that handles dragging */
+      .progress-input {
+        position: relative;
         width: 100%;
         height: 4px;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        background: transparent !important;
-        position: relative;
+        -webkit-appearance: none;
+        appearance: none;
+        background: transparent;
         z-index: 3;
         cursor: pointer;
         margin: 0;
         padding: 0;
-        border: none !important;
-        outline: none !important;
+        outline: none;
+        border: none;
       }
-      .progress-container input[type="range"]::-webkit-slider-track {
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        background: transparent !important;
+      .progress-input::-webkit-slider-track {
+        -webkit-appearance: none;
+        appearance: none;
+        background: transparent;
         height: 4px;
-        border: none !important;
+        border: none;
       }
-      .progress-container input[type="range"]::-moz-range-track {
-        -moz-appearance: none !important;
-        appearance: none !important;
-        background: transparent !important;
+      .progress-input::-moz-range-track {
+        -moz-appearance: none;
+        appearance: none;
+        background: transparent;
         height: 4px;
-        border: none !important;
+        border: none;
       }
-      .progress-container input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        width: 14px !important;
-        height: 14px !important;
-        border-radius: 50% !important;
-        background: #ffffff !important;
-        cursor: pointer !important;
-        margin-top: -5px !important;
-        box-shadow: 0 0 6px rgba(0,0,0,0.6) !important;
-        border: 2px solid #ff0000 !important;
-        position: relative !important;
-        z-index: 5 !important;
+      .progress-input::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #ffffff;
+        cursor: pointer;
+        margin-top: -5px;
+        border: 2px solid #ff0000;
+        box-shadow: 0 0 6px rgba(0,0,0,0.6);
       }
-      .progress-container input[type="range"]::-moz-range-thumb {
-        -moz-appearance: none !important;
-        appearance: none !important;
-        width: 14px !important;
-        height: 14px !important;
-        border-radius: 50% !important;
-        background: #ffffff !important;
-        cursor: pointer !important;
-        border: 2px solid #ff0000 !important;
-        box-shadow: 0 0 6px rgba(0,0,0,0.6) !important;
-        position: relative !important;
-        z-index: 5 !important;
+      .progress-input::-moz-range-thumb {
+        -moz-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #ffffff;
+        cursor: pointer;
+        border: 2px solid #ff0000;
+        box-shadow: 0 0 6px rgba(0,0,0,0.6);
       }
 
       button {
@@ -345,11 +359,15 @@ export default {
         <button id="play-btn">▶</button>
         <button id="skip-back-btn" title="Skip backward 10 seconds">⏪</button>
         <button id="skip-forward-btn" title="Skip forward 10 seconds">⏩</button>
-        <div class="progress-container">
-          <div class="progress-loaded" id="progress-loaded"></div>
-          <div class="progress-played" id="progress-played"></div>
-          <input type="range" id="progress" min="0" max="100" value="0">
+        
+        <!-- ===== REBUILT PROGRESS BAR ===== -->
+        <div class="progress-wrapper" id="progressWrapper">
+          <div class="progress-track" id="progressTrack"></div>
+          <div class="progress-loaded" id="progressLoaded"></div>
+          <div class="progress-played" id="progressPlayed"></div>
+          <input type="range" class="progress-input" id="progressInput" min="0" max="100" value="0">
         </div>
+        
         <div class="volume-container">
           <button id="mute-btn">🔊</button>
           <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
@@ -390,16 +408,14 @@ export default {
     const skipBackBtn = document.getElementById('skip-back-btn');
     const skipForwardBtn = document.getElementById('skip-forward-btn');
     const muteBtn = document.getElementById('mute-btn');
-    const progress = document.getElementById('progress');
-    const progressLoaded = document.getElementById('progress-loaded');
-    const progressPlayed = document.getElementById('progress-played');
+    const progressInput = document.getElementById('progressInput');
+    const progressLoaded = document.getElementById('progressLoaded');
+    const progressPlayed = document.getElementById('progressPlayed');
+    const progressWrapper = document.getElementById('progressWrapper');
     const volume = document.getElementById('volume');
     const urlInput = document.getElementById('videoUrlInput');
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
-
-    // ===== FORCE WHITE via inline style =====
-    progressLoaded.style.backgroundColor = '#ffffff';
 
     // ===== Controls visibility =====
     let hideTimeout;
@@ -477,7 +493,7 @@ export default {
     function updateProgress() {
       if (video.duration > 0) {
         const percent = (video.currentTime / video.duration) * 100;
-        progress.value = percent;
+        progressInput.value = percent;
         progressPlayed.style.width = percent + '%';
         updateLoaded();
       }
@@ -487,19 +503,28 @@ export default {
       if (video.duration > 0 && video.buffered.length > 0) {
         const bufferedEnd = video.buffered.end(video.buffered.length - 1);
         const percent = (bufferedEnd / video.duration) * 100;
-        const width = Math.min(percent, 100) + '%';
-        progressLoaded.style.width = width;
-        progressLoaded.style.backgroundColor = '#ffffff';
+        progressLoaded.style.width = Math.min(percent, 100) + '%';
       } else {
         progressLoaded.style.width = '0%';
-        progressLoaded.style.backgroundColor = '#ffffff';
       }
     }
 
     function setProgress() {
-      const time = (progress.value * video.duration) / 100;
+      const time = (progressInput.value * video.duration) / 100;
       video.currentTime = time;
-      progressPlayed.style.width = progress.value + '%';
+      progressPlayed.style.width = progressInput.value + '%';
+      showControls();
+    }
+
+    // Click on the progress bar to seek
+    function handleProgressClick(e) {
+      const rect = progressWrapper.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width;
+      const percent = Math.max(0, Math.min(100, x * 100));
+      progressInput.value = percent;
+      const time = (percent * video.duration) / 100;
+      video.currentTime = time;
+      progressPlayed.style.width = percent + '%';
       showControls();
     }
 
@@ -533,7 +558,6 @@ export default {
 
     function resetLoaded() {
       progressLoaded.style.width = '0%';
-      progressLoaded.style.backgroundColor = '#ffffff';
     }
 
     // ===== Load video =====
@@ -548,6 +572,7 @@ export default {
       emptyState.style.display = 'none';
       resetLoaded();
       progressPlayed.style.width = '0%';
+      progressInput.value = 0;
       showControls();
 
       const hash = encodeUrl(newUrl);
@@ -566,7 +591,8 @@ export default {
     skipBackBtn.addEventListener('click', skipBack);
     skipForwardBtn.addEventListener('click', skipForward);
     muteBtn.addEventListener('click', toggleMute);
-    progress.addEventListener('input', setProgress);
+    progressInput.addEventListener('input', setProgress);
+    progressWrapper.addEventListener('click', handleProgressClick);
     volume.addEventListener('input', handleVolume);
     loadBtn.addEventListener('click', loadVideo);
     urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
@@ -577,6 +603,7 @@ export default {
     video.addEventListener('durationchange', () => {
       resetLoaded();
       progressPlayed.style.width = '0%';
+      progressInput.value = 0;
     });
 
     // ===== On page load =====
