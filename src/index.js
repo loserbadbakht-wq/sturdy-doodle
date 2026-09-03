@@ -85,7 +85,7 @@ export default {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="color-scheme" content="light only"> <!-- Force light mode -->
+    <meta name="color-scheme" content="light only">
     <title>__TITLE__</title>
 
     <meta property="og:title" content="__TITLE__" />
@@ -99,15 +99,8 @@ export default {
           href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
 
     <style>
-      /* Force light mode globally */
-      html {
-        color-scheme: light !important;
-      }
-      * {
-        color-scheme: light !important;
-      }
-
       * { margin: 0; padding: 0; box-sizing: border-box; }
+      html { color-scheme: light !important; }
       body {
         background-color: #141414;
         display: flex;
@@ -169,7 +162,7 @@ export default {
         flex: 1;
         position: relative;
         height: 4px;
-        background: #2a2a2a; /* dark grey background */
+        background: #222;
         border-radius: 2px;
         cursor: pointer;
       }
@@ -178,12 +171,11 @@ export default {
         left: 0;
         top: 0;
         height: 100%;
-        background: #ffffff !important; /* SOLID WHITE */
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
         z-index: 1;
-        forced-color-adjust: none; /* prevent system color overrides */
+        /* background set via inline style in JavaScript */
       }
       .progress-played {
         position: absolute;
@@ -195,7 +187,6 @@ export default {
         pointer-events: none;
         width: 0%;
         z-index: 2;
-        forced-color-adjust: none;
       }
       .progress-container input[type="range"] {
         width: 100%;
@@ -392,6 +383,9 @@ export default {
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
 
+    // ===== FORCE WHITE on the loading bar =====
+    progressLoaded.style.backgroundColor = '#ffffff';
+
     // ===== Controls visibility =====
     let hideTimeout;
 
@@ -478,9 +472,12 @@ export default {
       if (video.duration > 0 && video.buffered.length > 0) {
         const bufferedEnd = video.buffered.end(video.buffered.length - 1);
         const percent = (bufferedEnd / video.duration) * 100;
-        progressLoaded.style.width = Math.min(percent, 100) + '%';
+        const width = Math.min(percent, 100) + '%';
+        progressLoaded.style.width = width;
+        progressLoaded.style.backgroundColor = '#ffffff'; // FORCE WHITE via inline style
       } else {
         progressLoaded.style.width = '0%';
+        progressLoaded.style.backgroundColor = '#ffffff';
       }
     }
 
@@ -521,6 +518,7 @@ export default {
 
     function resetLoaded() {
       progressLoaded.style.width = '0%';
+      progressLoaded.style.backgroundColor = '#ffffff';
     }
 
     // ===== Load video =====
