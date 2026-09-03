@@ -158,9 +158,9 @@ export default {
       .progress-container {
         flex: 1;
         position: relative;
-        height: 4px;
-        background: #1a1a1a;
-        border-radius: 2px;
+        height: 6px;          /* increased to see better */
+        background: #333;      /* dark grey so white/yellow shows */
+        border-radius: 3px;
         cursor: pointer;
       }
       .progress-loaded {
@@ -168,11 +168,12 @@ export default {
         left: 0;
         top: 0;
         height: 100%;
-        background: #ffffff;   /* SOLID WHITE */
-        border-radius: 2px;
+        background: #ffff00;   /* YELLOW to clearly see it */
+        border-radius: 3px;
         pointer-events: none;
         width: 0%;
         z-index: 1;
+        border: 1px solid rgba(255,255,255,0.2); /* subtle border */
       }
       .progress-played {
         position: absolute;
@@ -180,14 +181,14 @@ export default {
         top: 0;
         height: 100%;
         background: #ff0000;
-        border-radius: 2px;
+        border-radius: 3px;
         pointer-events: none;
         width: 0%;
         z-index: 2;
       }
       .progress-container input[type="range"] {
         width: 100%;
-        height: 4px;
+        height: 6px;
         -webkit-appearance: none;
         appearance: none;
         background: transparent;
@@ -203,13 +204,13 @@ export default {
       .progress-container input[type="range"]::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
-        width: 12px;
-        height: 12px;
+        width: 14px;
+        height: 14px;
         border-radius: 50%;
         background: #fff;
         cursor: pointer;
         margin-top: -4px;
-        box-shadow: 0 0 4px rgba(0,0,0,0.6);
+        box-shadow: 0 0 6px rgba(0,0,0,0.8);
         border: 2px solid #ff0000;
       }
       .progress-container input[type="range"]::-moz-range-track {
@@ -217,12 +218,13 @@ export default {
         border: none;
       }
       .progress-container input[type="range"]::-moz-range-thumb {
-        width: 12px;
-        height: 12px;
+        width: 14px;
+        height: 14px;
         border-radius: 50%;
         background: #fff;
         cursor: pointer;
         border: 2px solid #ff0000;
+        box-shadow: 0 0 6px rgba(0,0,0,0.8);
       }
 
       button {
@@ -467,8 +469,10 @@ export default {
         const bufferedEnd = video.buffered.end(video.buffered.length - 1);
         const percent = (bufferedEnd / video.duration) * 100;
         progressLoaded.style.width = Math.min(percent, 100) + '%';
+        console.log('Loaded %:', percent); // debug
       } else {
         progressLoaded.style.width = '0%';
+        console.log('Loaded: 0%');
       }
     }
 
