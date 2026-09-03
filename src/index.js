@@ -154,12 +154,12 @@ export default {
         pointer-events: auto;
       }
 
-      /* ---- PROGRESS BAR (FIXED STACKING) ---- */
+      /* ---- PROGRESS BAR ---- */
       .progress-container {
         flex: 1;
         position: relative;
         height: 4px;
-        background: #1a1a1a;        /* dark grey so you can see the loaded bar */
+        background: #1a1a1a;
         border-radius: 2px;
         cursor: pointer;
       }
@@ -168,7 +168,7 @@ export default {
         left: 0;
         top: 0;
         height: 100%;
-        background: rgba(255, 255, 255, 0.35);
+        background: #ffffff;   /* SOLID WHITE */
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
