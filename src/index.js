@@ -154,7 +154,7 @@ export default {
         pointer-events: auto;
       }
 
-      /* ===== REBUILT PROGRESS BAR FROM SCRATCH ===== */
+      /* ===== CUSTOM PROGRESS BAR (no native slider visibility) ===== */
       .progress-wrapper {
         flex: 1;
         position: relative;
@@ -163,8 +163,8 @@ export default {
         display: flex;
         align-items: center;
       }
-      
-      /* The track background (always visible) */
+
+      /* Track background */
       .progress-track {
         position: absolute;
         left: 0;
@@ -175,8 +175,8 @@ export default {
         border-radius: 2px;
         pointer-events: none;
       }
-      
-      /* Loaded (buffered) - white */
+
+      /* Loaded (buffered) – always white */
       .progress-loaded {
         position: absolute;
         left: 0;
@@ -189,8 +189,8 @@ export default {
         z-index: 1;
         transition: width 0.1s ease;
       }
-      
-      /* Played - red */
+
+      /* Played – red */
       .progress-played {
         position: absolute;
         left: 0;
@@ -203,60 +203,68 @@ export default {
         z-index: 2;
         transition: width 0.05s linear;
       }
-      
-      /* The invisible range input that handles dragging */
+
+      /* Custom thumb – fully controlled by us */
+      .progress-thumb {
+        position: absolute;
+        top: 50%;
+        left: 0%;
+        transform: translate(-50%, -50%);
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 2px solid #ff0000;
+        box-shadow: 0 0 6px rgba(0,0,0,0.6);
+        pointer-events: none;
+        z-index: 4;
+        transition: left 0.05s linear;
+      }
+
+      /* Invisible range input – covers the whole wrapper, handles all interaction */
       .progress-input {
-        position: relative;
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
-        height: 4px;
+        height: 100%;
         -webkit-appearance: none;
-        -moz-appearance: none;          /* FIX: added for Firefox */
-        appearance: none;
-        background: transparent;
-        z-index: 3;
-        cursor: pointer;
-        margin: 0;
-        padding: 0;
-        outline: none;
-        border: none;
-      }
-      .progress-input::-webkit-slider-runnable-track {   /* FIX: correct WebKit pseudo-element */
-        -webkit-appearance: none;
-        appearance: none;
-        background: transparent;
-        height: 4px;
-        border: none;
-      }
-      .progress-input::-moz-range-track {
         -moz-appearance: none;
         appearance: none;
         background: transparent;
-        height: 4px;
+        opacity: 0;          /* completely invisible */
+        z-index: 5;
+        cursor: pointer;
+        margin: 0;
+        padding: 0;
         border: none;
+        outline: none;
       }
       .progress-input::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
         width: 14px;
         height: 14px;
-        border-radius: 50%;
-        background: #ffffff;
+        background: transparent;
+        border: none;
         cursor: pointer;
-        margin-top: -5px;
-        border: 2px solid #ff0000;
-        box-shadow: 0 0 6px rgba(0,0,0,0.6);
       }
       .progress-input::-moz-range-thumb {
         -moz-appearance: none;
         appearance: none;
         width: 14px;
         height: 14px;
-        border-radius: 50%;
-        background: #ffffff;
+        background: transparent;
+        border: none;
         cursor: pointer;
-        margin-top: -5px;               /* FIX: added for vertical centering */
-        border: 2px solid #ff0000;
-        box-shadow: 0 0 6px rgba(0,0,0,0.6);
+      }
+      .progress-input::-webkit-slider-runnable-track {
+        background: transparent;
+        border: none;
+      }
+      .progress-input::-moz-range-track {
+        background: transparent;
+        border: none;
       }
 
       button {
@@ -362,11 +370,12 @@ export default {
         <button id="skip-back-btn" title="Skip backward 10 seconds">⏪</button>
         <button id="skip-forward-btn" title="Skip forward 10 seconds">⏩</button>
         
-        <!-- ===== REBUILT PROGRESS BAR ===== -->
+        <!-- ===== CUSTOM PROGRESS BAR ===== -->
         <div class="progress-wrapper" id="progressWrapper">
           <div class="progress-track" id="progressTrack"></div>
           <div class="progress-loaded" id="progressLoaded"></div>
           <div class="progress-played" id="progressPlayed"></div>
+          <div class="progress-thumb" id="progressThumb"></div>
           <input type="range" class="progress-input" id="progressInput" min="0" max="100" value="0">
         </div>
         
@@ -413,6 +422,7 @@ export default {
     const progressInput = document.getElementById('progressInput');
     const progressLoaded = document.getElementById('progressLoaded');
     const progressPlayed = document.getElementById('progressPlayed');
+    const progressThumb = document.getElementById('progressThumb');
     const progressWrapper = document.getElementById('progressWrapper');
     const volume = document.getElementById('volume');
     const urlInput = document.getElementById('videoUrlInput');
@@ -497,6 +507,7 @@ export default {
         const percent = (video.currentTime / video.duration) * 100;
         progressInput.value = percent;
         progressPlayed.style.width = percent + '%';
+        progressThumb.style.left = percent + '%';
         updateLoaded();
       }
     }
@@ -512,10 +523,14 @@ export default {
     }
 
     function setProgress() {
-      const time = (progressInput.value * video.duration) / 100;
-      video.currentTime = time;
-      progressPlayed.style.width = progressInput.value + '%';
-      showControls();
+      const percent = parseFloat(progressInput.value);
+      if (!isNaN(percent) && video.duration > 0) {
+        const time = (percent * video.duration) / 100;
+        video.currentTime = time;
+        progressPlayed.style.width = percent + '%';
+        progressThumb.style.left = percent + '%';
+        showControls();
+      }
     }
 
     // Click on the progress bar to seek
@@ -527,6 +542,7 @@ export default {
       const time = (percent * video.duration) / 100;
       video.currentTime = time;
       progressPlayed.style.width = percent + '%';
+      progressThumb.style.left = percent + '%';
       showControls();
     }
 
@@ -575,6 +591,7 @@ export default {
       resetLoaded();
       progressPlayed.style.width = '0%';
       progressInput.value = 0;
+      progressThumb.style.left = '0%';
       showControls();
 
       const hash = encodeUrl(newUrl);
@@ -606,6 +623,7 @@ export default {
       resetLoaded();
       progressPlayed.style.width = '0%';
       progressInput.value = 0;
+      progressThumb.style.left = '0%';
     });
 
     // ===== On page load =====
