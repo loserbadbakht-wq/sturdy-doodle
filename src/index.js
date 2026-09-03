@@ -85,7 +85,7 @@ export default {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="color-scheme" content="light only">  <!-- DISABLE DARK MODE -->
+    <meta name="color-scheme" content="light only"> <!-- Force light mode -->
     <title>__TITLE__</title>
 
     <meta property="og:title" content="__TITLE__" />
@@ -99,6 +99,14 @@ export default {
           href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
 
     <style>
+      /* Force light mode globally */
+      html {
+        color-scheme: light !important;
+      }
+      * {
+        color-scheme: light !important;
+      }
+
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
         background-color: #141414;
@@ -108,7 +116,7 @@ export default {
         min-height: 100vh;
         font-family: sans-serif;
         padding: 20px;
-        color-scheme: light; /* force light mode for this page */
+        color-scheme: light;
       }
       .main-container {
         width: 100%;
@@ -161,7 +169,7 @@ export default {
         flex: 1;
         position: relative;
         height: 4px;
-        background: #222;
+        background: #2a2a2a; /* dark grey background */
         border-radius: 2px;
         cursor: pointer;
       }
@@ -170,11 +178,12 @@ export default {
         left: 0;
         top: 0;
         height: 100%;
-        background: #ffffff !important; /* FORCE WHITE */
+        background: #ffffff !important; /* SOLID WHITE */
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
         z-index: 1;
+        forced-color-adjust: none; /* prevent system color overrides */
       }
       .progress-played {
         position: absolute;
@@ -186,6 +195,7 @@ export default {
         pointer-events: none;
         width: 0%;
         z-index: 2;
+        forced-color-adjust: none;
       }
       .progress-container input[type="range"] {
         width: 100%;
