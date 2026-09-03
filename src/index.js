@@ -210,6 +210,7 @@ export default {
         width: 100%;
         height: 4px;
         -webkit-appearance: none;
+        -moz-appearance: none;          /* FIX: added for Firefox */
         appearance: none;
         background: transparent;
         z-index: 3;
@@ -219,7 +220,7 @@ export default {
         outline: none;
         border: none;
       }
-      .progress-input::-webkit-slider-track {
+      .progress-input::-webkit-slider-runnable-track {   /* FIX: correct WebKit pseudo-element */
         -webkit-appearance: none;
         appearance: none;
         background: transparent;
@@ -253,7 +254,7 @@ export default {
         border-radius: 50%;
         background: #ffffff;
         cursor: pointer;
-        margin-top: -5px; /* FIX: added for vertical centering in Firefox */
+        margin-top: -5px;               /* FIX: added for vertical centering */
         border: 2px solid #ff0000;
         box-shadow: 0 0 6px rgba(0,0,0,0.6);
       }
