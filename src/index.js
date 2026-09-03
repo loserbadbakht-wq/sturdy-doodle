@@ -154,7 +154,7 @@ export default {
         pointer-events: auto;
       }
 
-      /* ---- PROGRESS BAR ---- */
+      /* ---- PROGRESS BAR - FORCE RESET ---- */
       .progress-container {
         flex: 1;
         position: relative;
@@ -172,7 +172,7 @@ export default {
         pointer-events: none;
         width: 0%;
         z-index: 1;
-        /* background forced white via JavaScript with !important */
+        /* background set via JavaScript inline style */
       }
       .progress-played {
         position: absolute;
@@ -185,44 +185,62 @@ export default {
         width: 0%;
         z-index: 2;
       }
+
+      /* FORCE RESET of the range input */
       .progress-container input[type="range"] {
         width: 100%;
         height: 4px;
-        -webkit-appearance: none;
-        appearance: none;
-        background: transparent;
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        background: transparent !important;
         position: relative;
         z-index: 3;
         cursor: pointer;
         margin: 0;
         padding: 0;
+        border: none !important;
+        outline: none !important;
       }
       .progress-container input[type="range"]::-webkit-slider-track {
-        background: transparent;
-      }
-      .progress-container input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: #fff;
-        cursor: pointer;
-        margin-top: -4px;
-        box-shadow: 0 0 4px rgba(0,0,0,0.6);
-        border: 2px solid #ff0000;
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        background: transparent !important;
+        height: 4px;
+        border: none !important;
       }
       .progress-container input[type="range"]::-moz-range-track {
-        background: transparent;
-        border: none;
+        -moz-appearance: none !important;
+        appearance: none !important;
+        background: transparent !important;
+        height: 4px;
+        border: none !important;
+      }
+      .progress-container input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        width: 14px !important;
+        height: 14px !important;
+        border-radius: 50% !important;
+        background: #ffffff !important;
+        cursor: pointer !important;
+        margin-top: -5px !important;
+        box-shadow: 0 0 6px rgba(0,0,0,0.6) !important;
+        border: 2px solid #ff0000 !important;
+        position: relative !important;
+        z-index: 5 !important;
       }
       .progress-container input[type="range"]::-moz-range-thumb {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: #fff;
-        cursor: pointer;
-        border: 2px solid #ff0000;
+        -moz-appearance: none !important;
+        appearance: none !important;
+        width: 14px !important;
+        height: 14px !important;
+        border-radius: 50% !important;
+        background: #ffffff !important;
+        cursor: pointer !important;
+        border: 2px solid #ff0000 !important;
+        box-shadow: 0 0 6px rgba(0,0,0,0.6) !important;
+        position: relative !important;
+        z-index: 5 !important;
       }
 
       button {
@@ -380,8 +398,8 @@ export default {
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
 
-    // ===== FORCE WHITE with !important using setProperty (no border) =====
-    progressLoaded.style.setProperty('background-color', '#ffffff', 'important');
+    // ===== FORCE WHITE via inline style =====
+    progressLoaded.style.backgroundColor = '#ffffff';
 
     // ===== Controls visibility =====
     let hideTimeout;
@@ -471,11 +489,10 @@ export default {
         const percent = (bufferedEnd / video.duration) * 100;
         const width = Math.min(percent, 100) + '%';
         progressLoaded.style.width = width;
-        // FORCE WHITE with !important
-        progressLoaded.style.setProperty('background-color', '#ffffff', 'important');
+        progressLoaded.style.backgroundColor = '#ffffff';
       } else {
         progressLoaded.style.width = '0%';
-        progressLoaded.style.setProperty('background-color', '#ffffff', 'important');
+        progressLoaded.style.backgroundColor = '#ffffff';
       }
     }
 
@@ -516,7 +533,7 @@ export default {
 
     function resetLoaded() {
       progressLoaded.style.width = '0%';
-      progressLoaded.style.setProperty('background-color', '#ffffff', 'important');
+      progressLoaded.style.backgroundColor = '#ffffff';
     }
 
     // ===== Load video =====
