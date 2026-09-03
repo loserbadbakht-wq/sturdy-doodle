@@ -85,6 +85,7 @@ export default {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="color-scheme" content="light only">  <!-- DISABLE DARK MODE -->
     <title>__TITLE__</title>
 
     <meta property="og:title" content="__TITLE__" />
@@ -107,6 +108,7 @@ export default {
         min-height: 100vh;
         font-family: sans-serif;
         padding: 20px;
+        color-scheme: light; /* force light mode for this page */
       }
       .main-container {
         width: 100%;
@@ -159,7 +161,7 @@ export default {
         flex: 1;
         position: relative;
         height: 4px;
-        background: #222;        /* dark grey background */
+        background: #222;
         border-radius: 2px;
         cursor: pointer;
       }
@@ -168,7 +170,7 @@ export default {
         left: 0;
         top: 0;
         height: 100%;
-        background: #ffffff;    /* SOLID WHITE loading bar */
+        background: #ffffff !important; /* FORCE WHITE */
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
@@ -179,7 +181,7 @@ export default {
         left: 0;
         top: 0;
         height: 100%;
-        background: #ff0000;    /* RED played bar */
+        background: #ff0000;
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
