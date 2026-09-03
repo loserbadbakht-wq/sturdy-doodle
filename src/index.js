@@ -253,6 +253,7 @@ export default {
         border-radius: 50%;
         background: #ffffff;
         cursor: pointer;
+        margin-top: -5px; /* FIX: added for vertical centering in Firefox */
         border: 2px solid #ff0000;
         box-shadow: 0 0 6px rgba(0,0,0,0.6);
       }
