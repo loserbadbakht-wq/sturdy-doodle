@@ -98,6 +98,9 @@ export default {
           href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
 
     <style>
+      :root {
+        color-scheme: light;
+      }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
         background-color: #141414;
@@ -107,6 +110,8 @@ export default {
         min-height: 100vh;
         font-family: sans-serif;
         padding: 20px;
+        filter: none !important;
+        mix-blend-mode: normal !important;
       }
       .main-container {
         width: 100%;
@@ -162,6 +167,8 @@ export default {
         cursor: pointer;
         display: flex;
         align-items: center;
+        filter: none !important;
+        mix-blend-mode: normal !important;
       }
 
       /* Track background */
@@ -175,6 +182,8 @@ export default {
         background-color: #333 !important;
         border-radius: 2px;
         pointer-events: none;
+        filter: none !important;
+        mix-blend-mode: normal !important;
       }
 
       /* Loaded (buffered) – always white */
@@ -190,6 +199,8 @@ export default {
         width: 0%;
         z-index: 1;
         transition: width 0.1s ease;
+        filter: none !important;
+        mix-blend-mode: normal !important;
       }
 
       /* Played – red */
@@ -205,6 +216,8 @@ export default {
         width: 0%;
         z-index: 2;
         transition: width 0.05s linear;
+        filter: none !important;
+        mix-blend-mode: normal !important;
       }
 
       /* Custom thumb – fully controlled */
@@ -223,6 +236,8 @@ export default {
         pointer-events: none;
         z-index: 4;
         transition: left 0.05s linear;
+        filter: none !important;
+        mix-blend-mode: normal !important;
       }
 
       /* Invisible interaction layer – captures all clicks/drags */
@@ -236,6 +251,8 @@ export default {
         cursor: pointer;
         background: transparent;
         -webkit-tap-highlight-color: transparent;
+        filter: none !important;
+        mix-blend-mode: normal !important;
       }
 
       button {
