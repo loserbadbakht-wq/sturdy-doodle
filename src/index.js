@@ -154,7 +154,7 @@ export default {
         pointer-events: auto;
       }
 
-      /* ===== CUSTOM PROGRESS BAR (no native slider visibility) ===== */
+      /* ===== FULLY CUSTOM PROGRESS BAR (no range input) ===== */
       .progress-wrapper {
         flex: 1;
         position: relative;
@@ -204,7 +204,7 @@ export default {
         transition: width 0.05s linear;
       }
 
-      /* Custom thumb – fully controlled by us */
+      /* Custom thumb – fully controlled */
       .progress-thumb {
         position: absolute;
         top: 50%;
@@ -221,50 +221,17 @@ export default {
         transition: left 0.05s linear;
       }
 
-      /* Invisible range input – covers the whole wrapper, handles all interaction */
-      .progress-input {
+      /* Invisible interaction layer – captures all clicks/drags */
+      .progress-interaction {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        -webkit-appearance: none;
-        -moz-appearance: none;
-        appearance: none;
-        background: transparent;
-        opacity: 0;          /* completely invisible */
         z-index: 5;
         cursor: pointer;
-        margin: 0;
-        padding: 0;
-        border: none;
-        outline: none;
-      }
-      .progress-input::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 14px;
-        height: 14px;
         background: transparent;
-        border: none;
-        cursor: pointer;
-      }
-      .progress-input::-moz-range-thumb {
-        -moz-appearance: none;
-        appearance: none;
-        width: 14px;
-        height: 14px;
-        background: transparent;
-        border: none;
-        cursor: pointer;
-      }
-      .progress-input::-webkit-slider-runnable-track {
-        background: transparent;
-        border: none;
-      }
-      .progress-input::-moz-range-track {
-        background: transparent;
-        border: none;
+        -webkit-tap-highlight-color: transparent;
       }
 
       button {
@@ -376,7 +343,7 @@ export default {
           <div class="progress-loaded" id="progressLoaded"></div>
           <div class="progress-played" id="progressPlayed"></div>
           <div class="progress-thumb" id="progressThumb"></div>
-          <input type="range" class="progress-input" id="progressInput" min="0" max="100" value="0">
+          <div class="progress-interaction" id="progressInteraction"></div>
         </div>
         
         <div class="volume-container">
@@ -419,15 +386,66 @@ export default {
     const skipBackBtn = document.getElementById('skip-back-btn');
     const skipForwardBtn = document.getElementById('skip-forward-btn');
     const muteBtn = document.getElementById('mute-btn');
-    const progressInput = document.getElementById('progressInput');
     const progressLoaded = document.getElementById('progressLoaded');
     const progressPlayed = document.getElementById('progressPlayed');
     const progressThumb = document.getElementById('progressThumb');
     const progressWrapper = document.getElementById('progressWrapper');
+    const progressInteraction = document.getElementById('progressInteraction');
     const volume = document.getElementById('volume');
     const urlInput = document.getElementById('videoUrlInput');
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
+
+    // ===== Progress bar interaction (custom drag) =====
+    let isDragging = false;
+
+    function getPercentFromEvent(e) {
+      const rect = progressWrapper.getBoundingClientRect();
+      const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+      const x = clientX - rect.left;
+      return Math.max(0, Math.min(100, (x / rect.width) * 100));
+    }
+
+    function seekToPercent(percent) {
+      if (video.duration > 0) {
+        const time = (percent * video.duration) / 100;
+        video.currentTime = time;
+        progressPlayed.style.width = percent + '%';
+        progressThumb.style.left = percent + '%';
+      }
+    }
+
+    function handleProgressStart(e) {
+      e.preventDefault();
+      isDragging = true;
+      const percent = getPercentFromEvent(e);
+      seekToPercent(percent);
+      showControls();
+    }
+
+    function handleProgressMove(e) {
+      if (!isDragging) return;
+      e.preventDefault();
+      const percent = getPercentFromEvent(e);
+      seekToPercent(percent);
+      showControls();
+    }
+
+    function handleProgressEnd(e) {
+      isDragging = false;
+      showControls();
+    }
+
+    // Mouse events
+    progressInteraction.addEventListener('mousedown', handleProgressStart);
+    document.addEventListener('mousemove', handleProgressMove);
+    document.addEventListener('mouseup', handleProgressEnd);
+
+    // Touch events
+    progressInteraction.addEventListener('touchstart', handleProgressStart, { passive: false });
+    progressInteraction.addEventListener('touchmove', handleProgressMove, { passive: false });
+    progressInteraction.addEventListener('touchend', handleProgressEnd);
+    progressInteraction.addEventListener('touchcancel', handleProgressEnd);
 
     // ===== Controls visibility =====
     let hideTimeout;
@@ -445,12 +463,12 @@ export default {
       clearTimeout(hideTimeout);
     }
 
-    // Mouse events
+    // Mouse events for player wrapper
     playerWrapper.addEventListener('mouseenter', showControls);
     playerWrapper.addEventListener('mousemove', showControls);
     playerWrapper.addEventListener('mouseleave', hideControlsImmediately);
 
-    // ===== Touch events =====
+    // ===== Touch events for video (tap to play/pause, hold to toggle controls) =====
     let holdTimer = null;
     let isHeld = false;
 
@@ -505,7 +523,6 @@ export default {
     function updateProgress() {
       if (video.duration > 0) {
         const percent = (video.currentTime / video.duration) * 100;
-        progressInput.value = percent;
         progressPlayed.style.width = percent + '%';
         progressThumb.style.left = percent + '%';
         updateLoaded();
@@ -520,30 +537,6 @@ export default {
       } else {
         progressLoaded.style.width = '0%';
       }
-    }
-
-    function setProgress() {
-      const percent = parseFloat(progressInput.value);
-      if (!isNaN(percent) && video.duration > 0) {
-        const time = (percent * video.duration) / 100;
-        video.currentTime = time;
-        progressPlayed.style.width = percent + '%';
-        progressThumb.style.left = percent + '%';
-        showControls();
-      }
-    }
-
-    // Click on the progress bar to seek
-    function handleProgressClick(e) {
-      const rect = progressWrapper.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width;
-      const percent = Math.max(0, Math.min(100, x * 100));
-      progressInput.value = percent;
-      const time = (percent * video.duration) / 100;
-      video.currentTime = time;
-      progressPlayed.style.width = percent + '%';
-      progressThumb.style.left = percent + '%';
-      showControls();
     }
 
     function handleVolume() {
@@ -590,7 +583,6 @@ export default {
       emptyState.style.display = 'none';
       resetLoaded();
       progressPlayed.style.width = '0%';
-      progressInput.value = 0;
       progressThumb.style.left = '0%';
       showControls();
 
@@ -610,8 +602,6 @@ export default {
     skipBackBtn.addEventListener('click', skipBack);
     skipForwardBtn.addEventListener('click', skipForward);
     muteBtn.addEventListener('click', toggleMute);
-    progressInput.addEventListener('input', setProgress);
-    progressWrapper.addEventListener('click', handleProgressClick);
     volume.addEventListener('input', handleVolume);
     loadBtn.addEventListener('click', loadVideo);
     urlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadVideo(); });
@@ -622,7 +612,6 @@ export default {
     video.addEventListener('durationchange', () => {
       resetLoaded();
       progressPlayed.style.width = '0%';
-      progressInput.value = 0;
       progressThumb.style.left = '0%';
     });
 
