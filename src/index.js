@@ -172,7 +172,7 @@ export default {
         pointer-events: none;
         width: 0%;
         z-index: 1;
-        /* background set via inline style in JavaScript */
+        /* background set via inline style in JavaScript with !important */
       }
       .progress-played {
         position: absolute;
@@ -380,9 +380,9 @@ export default {
     const loadBtn = document.getElementById('load-btn');
     const emptyState = document.getElementById('emptyState');
 
-    // ===== DEBUG: Force the loading bar to be visible with a red border =====
-    progressLoaded.style.backgroundColor = '#ffffff';
-    progressLoaded.style.border = '2px solid #ff0000';  // RED BORDER so you can see it
+    // ===== FORCE WHITE with !important using setProperty =====
+    progressLoaded.style.setProperty('background-color', '#ffffff', 'important');
+    progressLoaded.style.border = '2px solid #ff0000'; // Keep red border for debugging
 
     // ===== Controls visibility =====
     let hideTimeout;
@@ -472,11 +472,12 @@ export default {
         const percent = (bufferedEnd / video.duration) * 100;
         const width = Math.min(percent, 100) + '%';
         progressLoaded.style.width = width;
-        progressLoaded.style.backgroundColor = '#ffffff';
-        progressLoaded.style.border = '2px solid #ff0000'; // keep the red border
+        // FORCE WHITE with !important
+        progressLoaded.style.setProperty('background-color', '#ffffff', 'important');
+        progressLoaded.style.border = '2px solid #ff0000'; // keep red border
       } else {
         progressLoaded.style.width = '0%';
-        progressLoaded.style.backgroundColor = '#ffffff';
+        progressLoaded.style.setProperty('background-color', '#ffffff', 'important');
         progressLoaded.style.border = '2px solid #ff0000';
       }
     }
@@ -518,7 +519,7 @@ export default {
 
     function resetLoaded() {
       progressLoaded.style.width = '0%';
-      progressLoaded.style.backgroundColor = '#ffffff';
+      progressLoaded.style.setProperty('background-color', '#ffffff', 'important');
       progressLoaded.style.border = '2px solid #ff0000';
     }
 
