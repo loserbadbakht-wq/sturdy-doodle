@@ -171,7 +171,8 @@ export default {
         top: 0;
         width: 100%;
         height: 4px;
-        background: #333;
+        background: #333 !important;
+        background-color: #333 !important;
         border-radius: 2px;
         pointer-events: none;
       }
@@ -182,7 +183,8 @@ export default {
         left: 0;
         top: 0;
         height: 4px;
-        background: #ffffff;
+        background: #ffffff !important;
+        background-color: #ffffff !important;
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
@@ -196,7 +198,8 @@ export default {
         left: 0;
         top: 0;
         height: 4px;
-        background: #ff0000;
+        background: #ff0000 !important;
+        background-color: #ff0000 !important;
         border-radius: 2px;
         pointer-events: none;
         width: 0%;
@@ -213,8 +216,9 @@ export default {
         width: 14px;
         height: 14px;
         border-radius: 50%;
-        background: #ffffff;
-        border: 2px solid #ff0000;
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        border: 2px solid #ff0000 !important;
         box-shadow: 0 0 6px rgba(0,0,0,0.6);
         pointer-events: none;
         z-index: 4;
