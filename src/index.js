@@ -1,5 +1,5 @@
 // Cloudflare Worker - Streaming Proxy with HLS support
-// Deploy and use like: https://your-worker.workers.dev/https://example.com/video.m3u8
+// Usage: https://your-worker.workers.dev/https://example.com/video.m3u8
 
 addEventListener('fetch', event => {
   event.respondWith(handleRequest(event.request));
@@ -95,12 +95,10 @@ async function handleRequest(request) {
   }
 
   // Parse target URL from the path
-  // Path format: /https://example.com/path
   let targetPath = url.pathname.slice(1); // remove leading slash
   if (!targetPath) {
     return new Response('Missing target URL. Usage: ' + proxyBase + '/https://example.com', { status: 400 });
   }
-  // Reconstruct full target URL
   let targetUrl;
   try {
     targetUrl = new URL(targetPath);
@@ -147,9 +145,8 @@ async function handleRequest(request) {
 
     const contentType = responseHeaders.get('content-type') || '';
 
-    // Handle different content types
     if (contentType.includes('text/html')) {
-      // HTML: rewrite URLs and inject <base>
+      // HTML: rewrite URLs
       const originalHtml = await response.text();
       const rewriter = new HTMLRewriter()
         .on('a[href]', new UrlRewriter(targetUrl.href, proxyBase))
@@ -167,9 +164,14 @@ async function handleRequest(request) {
         .on('embed[src]', new UrlRewriter(targetUrl.href, proxyBase))
         .on('[style]', new UrlRewriter(targetUrl.href, proxyBase));
 
-      // Inject <base> tag as first element in <head>
-      let htmlWithBase = originalHtml.replace(/<head([^>]*)>/i, `<head$1><base href="${proxyBase}/${targetUrl.href}">`);
-      const rewrittenHtml = rewriter.transform(htmlWithBase);
+      // Create a Response object from the HTML string
+      const originalResponse = new Response(originalHtml, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' }
+      });
+      // Transform and get the rewritten HTML
+      const transformedResponse = rewriter.transform(originalResponse);
+      const rewrittenHtml = await transformedResponse.text();
+
       return new Response(rewrittenHtml, {
         status: response.status,
         statusText: response.statusText,
