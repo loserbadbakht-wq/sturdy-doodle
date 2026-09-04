@@ -9,10 +9,10 @@ addEventListener('fetch', event => {
 // Configuration
 // ============================
 const config = {
-  proxyDomains: [], // Add your worker domains here (optional)
-  separator: '', // You can set a custom separator like '------' if you prefer
+  proxyDomains: [],
+  separator: '',
   homepage: true,
-  allowedDomains: [], // Domain whitelist, empty = allow all
+  allowedDomains: [],
   browserEmulation: {
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36',
     accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
@@ -91,7 +91,6 @@ class UrlRewriter {
   }
 }
 
-// Meta content rewriter (refresh, OG tags)
 class MetaContentRewriter {
   constructor(baseURL, proxyDomain) {
     this.baseURL = baseURL;
@@ -119,7 +118,6 @@ class MetaContentRewriter {
   }
 }
 
-// Base tag rewriter
 class BaseTagRewriter {
   constructor(baseURL, proxyDomain) {
     this.baseURL = baseURL;
@@ -136,7 +134,6 @@ class BaseTagRewriter {
   }
 }
 
-// Style element rewriter (for <style> blocks)
 class StyleElementRewriter {
   constructor(baseURL, proxyDomain) {
     this.baseURL = baseURL;
@@ -176,7 +173,6 @@ function rewriteM3U8(content, baseUrl, proxyBase) {
 function rewriteCSS(css, baseURL, proxyDomain) {
   if (!css) return css;
 
-  // @import
   css = css.replace(/@import\s+(?:url\(\s*['"]?([^'")]+)['"]?\s*\)|['"]([^'"]+)['"]).*/g,
     function(match, urlMatch, directMatch) {
       const importUrl = urlMatch || directMatch;
@@ -190,7 +186,6 @@ function rewriteCSS(css, baseURL, proxyDomain) {
     }
   );
 
-  // url()
   css = css.replace(/url\(\s*(['"]?)([^'")]+)(['"]?)\s*\)/g,
     function(match, quote1, url, quote2) {
       if (!url || url.startsWith('data:') || url.startsWith(`https://${proxyDomain}/`)) return match;
@@ -203,7 +198,6 @@ function rewriteCSS(css, baseURL, proxyDomain) {
     }
   );
 
-  // image-set()
   css = css.replace(/image-set\(\s*(?:[^)]|(?:\([^)]*\)))+\)/g, function(match) {
     return match.replace(/url\(\s*(['"]?)([^'")]+)(['"]?)\s*\)/g, function(urlMatch, q1, u, q2) {
       if (!u || u.startsWith('data:') || u.startsWith(`https://${proxyDomain}/`)) return urlMatch;
@@ -220,7 +214,7 @@ function rewriteCSS(css, baseURL, proxyDomain) {
 }
 
 // ============================
-// JavaScript URL Rewriting
+// JavaScript URL Rewriting (server-side)
 // ============================
 function rewriteJavaScript(js, baseURL, proxyDomain) {
   if (!js) return js;
@@ -240,13 +234,73 @@ function rewriteJavaScript(js, baseURL, proxyDomain) {
 }
 
 // ============================
-// Fallback Script Injection
+// Client-side URL Interception & Fallback
 // ============================
 class HeadRewriter {
-  constructor(originalURL) {
+  constructor(originalURL, proxyBase) {
     this.originalURL = originalURL;
+    this.proxyBase = proxyBase;
   }
+
   element(element) {
+    // Inject interception script FIRST
+    element.prepend(`
+      <script>
+        window.__proxy_base__ = ${JSON.stringify(this.proxyBase)};
+        window.__target_url__ = ${JSON.stringify(this.originalURL)};
+        (function() {
+          const proxyBase = window.__proxy_base__;
+          const targetUrl = window.__target_url__;
+          function rewriteUrl(url) {
+            if (!url) return url;
+            if (url.startsWith('javascript:') || url.startsWith('data:') || url.startsWith('blob:')) return url;
+            if (url.startsWith(proxyBase)) return url; // already proxied
+            if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('//')) {
+              // Absolute or protocol-relative
+              return proxyBase + '/' + url;
+            }
+            // Relative URL: resolve against original target URL
+            try {
+              const absolute = new URL(url, targetUrl).href;
+              return proxyBase + '/' + absolute;
+            } catch (e) {
+              return url;
+            }
+          }
+
+          // Override fetch
+          const originalFetch = window.fetch;
+          window.fetch = function(input, init) {
+            if (typeof input === 'string') {
+              input = rewriteUrl(input);
+            } else if (input instanceof Request) {
+              const oldUrl = input.url;
+              const newUrl = rewriteUrl(oldUrl);
+              if (newUrl !== oldUrl) {
+                input = new Request(newUrl, input);
+              }
+            }
+            return originalFetch.call(this, input, init);
+          };
+
+          // Override XMLHttpRequest open
+          const originalOpen = XMLHttpRequest.prototype.open;
+          XMLHttpRequest.prototype.open = function(method, url, ...args) {
+            url = rewriteUrl(url);
+            return originalOpen.call(this, method, url, ...args);
+          };
+
+          // Override sendBeacon
+          const originalSendBeacon = navigator.sendBeacon;
+          navigator.sendBeacon = function(url, data) {
+            url = rewriteUrl(url);
+            return originalSendBeacon.call(this, url, data);
+          };
+        })();
+      </script>
+    `, { html: true });
+
+    // Then add the fallback script for images and other resources
     element.append(`
       <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -282,18 +336,14 @@ async function handleRequest(request) {
   const url = new URL(request.url);
   const proxyBase = `${url.protocol}//${url.host}`;
 
-  // Landing page
   if (url.pathname === '/' && request.method === 'GET' && !url.search) {
     if (config.homepage) return getHomePage(proxyBase);
   }
 
-  // Determine target URL
   let targetUrl;
   try {
-    // Parse target URL from path
     let targetPath = url.pathname.slice(1);
     if (!targetPath) {
-      // If query string exists and no path, treat as search
       if (url.searchParams.has('q')) {
         targetUrl = new URL('https://duckduckgo.com/');
         url.searchParams.forEach((v, k) => targetUrl.searchParams.set(k, v));
@@ -301,11 +351,9 @@ async function handleRequest(request) {
         return new Response('Missing target URL. Usage: ' + proxyBase + '/https://example.com', { status: 400 });
       }
     } else {
-      // Check if it's already a full URL
       if (targetPath.startsWith('http://') || targetPath.startsWith('https://')) {
         targetUrl = new URL(targetPath);
       } else {
-        // Relative path or search keyword
         let resolved = null;
         const ref = request.headers.get('Referer') || '';
         if (ref.startsWith(`${proxyBase}/`)) {
@@ -320,13 +368,9 @@ async function handleRequest(request) {
         if (resolved) {
           targetUrl = resolved;
         } else {
-          // No Referer or resolution failed
-          // Decide: if path contains a dot and no slash, treat as domain
           if (targetPath.includes('.') && !targetPath.includes('/')) {
-            // Looks like a domain (e.g., example.com), prepend https://
             targetUrl = new URL('https://' + targetPath);
           } else {
-            // Treat as search keyword on DuckDuckGo
             const q = encodeURIComponent(targetPath);
             targetUrl = new URL(`https://duckduckgo.com/?q=${q}${url.search ? '&' + url.search.substring(1) : ''}`);
           }
@@ -334,15 +378,12 @@ async function handleRequest(request) {
       }
     }
 
-    // Merge query parameters from proxy URL to target URL (except 'q' if used for search)
-    // We already handled search query above; for direct URLs, append other params.
     if (targetPath && (targetPath.startsWith('http://') || targetPath.startsWith('https://')) && url.searchParams.toString()) {
       url.searchParams.forEach((value, key) => {
         if (key !== 'url') targetUrl.searchParams.set(key, value);
       });
     }
 
-    // Domain whitelist check
     if (config.allowedDomains.length > 0) {
       const isAllowed = config.allowedDomains.some(domain =>
         targetUrl.hostname === domain || targetUrl.hostname.endsWith(`.${domain}`)
@@ -355,17 +396,13 @@ async function handleRequest(request) {
     return new Response(`URL parsing error: ${e.message}`, { status: 400, headers: { 'Content-Type': 'text/plain' } });
   }
 
-  // Wikipedia special handling
   const isWikipediaSite = config.specialSites.wikipedia.enabled &&
     config.specialSites.wikipedia.domains.some(d => targetUrl.hostname.endsWith(d));
 
-  // Build request headers with browser emulation
   const requestHeaders = new Headers();
-  // Copy essential original headers
   ['cookie', 'range', 'if-none-match', 'if-modified-since', 'content-type', 'content-length'].forEach(h => {
     if (request.headers.has(h)) requestHeaders.set(h, request.headers.get(h));
   });
-  // Browser emulation
   requestHeaders.set('User-Agent', config.browserEmulation.userAgent);
   requestHeaders.set('Accept', config.browserEmulation.accept);
   requestHeaders.set('Accept-Language', config.browserEmulation.acceptLanguage);
@@ -384,13 +421,12 @@ async function handleRequest(request) {
     method: request.method,
     headers: requestHeaders,
     body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
-    redirect: 'manual', // We handle redirects ourselves
+    redirect: 'manual',
   };
 
   try {
     const response = await fetch(targetUrl.href, fetchOptions);
 
-    // Copy and clean response headers
     const responseHeaders = new Headers(response.headers);
     responseHeaders.delete('content-security-policy');
     responseHeaders.delete('content-security-policy-report-only');
@@ -402,13 +438,11 @@ async function handleRequest(request) {
     responseHeaders.set('access-control-allow-credentials', 'true');
     responseHeaders.set('x-proxied-by', 'cloudflare-worker-streaming-proxy');
 
-    // Copy multiple Set-Cookie headers
     const setCookies = response.headers.getAll ? response.headers.getAll('Set-Cookie') : [];
     if (setCookies.length > 0) {
       setCookies.forEach(cookie => responseHeaders.append('Set-Cookie', cookie));
     }
 
-    // Handle redirects manually
     if ([301, 302, 307, 308].includes(response.status)) {
       const location = responseHeaders.get('Location');
       if (location) {
@@ -421,7 +455,6 @@ async function handleRequest(request) {
 
     const contentType = responseHeaders.get('content-type') || '';
 
-    // HTML
     if (contentType.includes('text/html')) {
       const originalHtml = await response.text();
       let rewriter = new HTMLRewriter()
@@ -447,9 +480,8 @@ async function handleRequest(request) {
         rewriter = rewriter.on('img[data-src]', new UrlRewriter(targetUrl.href, proxyBase));
       }
 
-      if (config.fallback.enabled && config.fallback.autoReload) {
-        rewriter = rewriter.on('head', new HeadRewriter(targetUrl.href));
-      }
+      // Always inject the head script (interception + fallback)
+      rewriter = rewriter.on('head', new HeadRewriter(targetUrl.href, proxyBase));
 
       const originalResponse = new Response(originalHtml, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       const transformed = rewriter.transform(originalResponse);
@@ -462,7 +494,6 @@ async function handleRequest(request) {
       });
     }
 
-    // CSS
     else if (contentType.includes('text/css') || contentType.includes('application/x-stylesheet')) {
       const cssText = await response.text();
       const rewrittenCSS = rewriteCSS(cssText, targetUrl, proxyBase);
@@ -473,7 +504,6 @@ async function handleRequest(request) {
       });
     }
 
-    // JavaScript
     else if (contentType.includes('application/javascript') || contentType.includes('text/javascript')) {
       const jsText = await response.text();
       const rewrittenJS = rewriteJavaScript(jsText, targetUrl, proxyBase);
@@ -484,7 +514,6 @@ async function handleRequest(request) {
       });
     }
 
-    // HLS
     else if (contentType.includes('application/vnd.apple.mpegurl') || contentType.includes('application/x-mpegurl') || targetUrl.pathname.endsWith('.m3u8')) {
       const playlist = await response.text();
       const rewritten = rewriteM3U8(playlist, targetUrl, proxyBase);
@@ -495,7 +524,6 @@ async function handleRequest(request) {
       });
     }
 
-    // Everything else: stream as-is
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
