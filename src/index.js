@@ -1,4 +1,4 @@
-// Cloudflare Worker: Twitch → m3u8 URL generator
+// Cloudflare Worker: Twitch → m3u8 URL generator (AMOLED theme + copy buttons)
 
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 const GQL_URL = 'https://gql.twitch.tv/gql';
@@ -21,7 +21,7 @@ const PLAYBACK_ACCESS_TOKEN_QUERY = {
   }
 };
 
-// Simple HTML page
+// AMOLED-friendly, modern HTML page
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -29,27 +29,167 @@ const html = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Twitch → m3u8</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { color: #9146ff; }
-    input[type="text"] { width: 100%; padding: 0.5rem; font-size: 1rem; margin-bottom: 1rem; }
-    button { padding: 0.6rem 1.2rem; font-size: 1rem; background: #9146ff; color: white; border: none; cursor: pointer; }
-    button:hover { background: #772ce8; }
-    #results { margin-top: 2rem; }
-    .stream-item { margin-bottom: 1rem; }
-    .stream-item label { display: block; font-weight: bold; margin-bottom: 0.2rem; }
-    .stream-item input[type="text"] { width: 100%; padding: 0.4rem; }
-    #error { color: red; margin-top: 1rem; }
-    #loading { display: none; margin-top: 1rem; }
+    :root {
+      --bg: #000000;
+      --surface: #121212;
+      --surface-hover: #1e1e1e;
+      --text: #ffffff;
+      --text-secondary: #b3b3b3;
+      --accent: #9146ff;
+      --accent-hover: #772ce8;
+      --border: #2a2a2a;
+      --radius: 8px;
+      --transition: 0.2s ease;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+    }
+    .container {
+      width: 100%;
+      max-width: 720px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 2rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    }
+    h1 {
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+      font-size: 1.8rem;
+      letter-spacing: -0.5px;
+    }
+    .subtitle {
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 0.8rem 1rem;
+      font-size: 1rem;
+      background: var(--surface-hover);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    input[type="text"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(145, 70, 255, 0.3);
+    }
+    button {
+      padding: 0.8rem 1.2rem;
+      font-size: 1rem;
+      font-weight: 600;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background var(--transition), transform 0.1s ease;
+      white-space: nowrap;
+    }
+    button:hover { background: var(--accent-hover); }
+    button:active { transform: scale(0.98); }
+    #loading {
+      display: none;
+      margin: 1rem 0;
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+    #error {
+      color: #ff4444;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+    #results {
+      margin-top: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .stream-item {
+      background: var(--surface-hover);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      transition: border-color var(--transition);
+    }
+    .stream-item:hover { border-color: #444; }
+    .stream-item label {
+      margin-bottom: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    .url-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .url-row input[type="text"] {
+      flex: 1;
+      background: #0a0a0a;
+      border: 1px solid #333;
+      padding: 0.6rem 0.8rem;
+      font-size: 0.9rem;
+    }
+    .copy-btn {
+      background: #333;
+      color: #fff;
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .copy-btn:hover { background: #444; }
+    .copy-btn.copied {
+      background: #2e7d32;
+      pointer-events: none;
+    }
+    footer {
+      margin-top: 2rem;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+    }
   </style>
 </head>
 <body>
-  <h1>Twitch → m3u8 URL Generator</h1>
-  <p>Enter a Twitch channel name (e.g. <code>twitch</code>)</p>
-  <input type="text" id="channel" placeholder="Channel name..." />
-  <button onclick="getStreams()">Get Streams</button>
-  <div id="loading">Loading…</div>
-  <div id="results"></div>
-  <div id="error"></div>
+  <div class="container">
+    <h1>Twitch → m3u8</h1>
+    <p class="subtitle">Get direct HLS stream URLs for any live channel</p>
+    <div class="input-row">
+      <input type="text" id="channel" placeholder="e.g. twitch, shroud, xqcow..." />
+      <button onclick="getStreams()">Get Streams</button>
+    </div>
+    <div id="loading">Loading…</div>
+    <div id="results"></div>
+    <div id="error"></div>
+    <footer>Works best with live channels • AMOLED friendly</footer>
+  </div>
 
   <script>
     async function getStreams() {
@@ -78,14 +218,44 @@ const html = `<!DOCTYPE html>
         data.streams.forEach(stream => {
           const div = document.createElement('div');
           div.className = 'stream-item';
+
           const label = document.createElement('label');
           label.textContent = stream.quality;
+
+          const rowDiv = document.createElement('div');
+          rowDiv.className = 'url-row';
+
           const input = document.createElement('input');
           input.type = 'text';
           input.readOnly = true;
           input.value = stream.url;
+
+          const copyBtn = document.createElement('button');
+          copyBtn.className = 'copy-btn';
+          copyBtn.textContent = 'Copy';
+          copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(stream.url).then(() => {
+              copyBtn.textContent = 'Copied!';
+              copyBtn.classList.add('copied');
+              setTimeout(() => {
+                copyBtn.textContent = 'Copy';
+                copyBtn.classList.remove('copied');
+              }, 1500);
+            }).catch(err => {
+              // Fallback for older browsers
+              input.select();
+              document.execCommand('copy');
+              copyBtn.textContent = 'Copied!';
+              setTimeout(() => {
+                copyBtn.textContent = 'Copy';
+              }, 1500);
+            });
+          });
+
+          rowDiv.appendChild(input);
+          rowDiv.appendChild(copyBtn);
           div.appendChild(label);
-          div.appendChild(input);
+          div.appendChild(rowDiv);
           results.appendChild(div);
         });
       } catch (err) {
@@ -112,7 +282,6 @@ async function getAccessToken(channel) {
     headers: {
       'Client-ID': CLIENT_ID,
       'Content-Type': 'application/json',
-      // User-Agent is set automatically by the Worker
     },
     body: JSON.stringify(query)
   });
@@ -181,7 +350,6 @@ function parseMasterPlaylist(masterText, masterUrl) {
     const line = lines[i].trim();
     if (line.startsWith('#EXT-X-STREAM-INF')) {
       currentStreamInfo = {};
-      // Parse attributes like BANDWIDTH=..., RESOLUTION=..., etc.
       const attrs = line.substring('#EXT-X-STREAM-INF:'.length).split(',');
       attrs.forEach(attr => {
         const idx = attr.indexOf('=');
@@ -192,7 +360,6 @@ function parseMasterPlaylist(masterText, masterUrl) {
         }
       });
     } else if (line && !line.startsWith('#')) {
-      // This is the URL for the previous EXT-X-STREAM-INF
       if (currentStreamInfo) {
         let quality = 'Unknown';
         if (currentStreamInfo['STABLE-VARIANT-ID']) {
@@ -203,11 +370,9 @@ function parseMasterPlaylist(masterText, masterUrl) {
             quality += ` ${currentStreamInfo['FRAME-RATE']}fps`;
           }
         }
-        // Mark audio-only
         if (quality.startsWith('audio')) {
           quality = 'audio_only';
         }
-        // Resolve relative URL
         const resolvedUrl = new URL(line, masterUrl).toString();
         streams.push({ quality, url: resolvedUrl });
       }
@@ -221,11 +386,8 @@ function parseMasterPlaylist(masterText, masterUrl) {
  * Main function: orchestrates token fetch, master playlist fetch, and parsing.
  */
 async function getStreams(channel) {
-  // 1. Get access token
   const { signature, value } = await getAccessToken(channel);
-  // 2. Get master playlist
   const { text, url } = await getMasterM3U8(channel, value, signature);
-  // 3. Parse variants
   return parseMasterPlaylist(text, url);
 }
 
