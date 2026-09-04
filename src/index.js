@@ -1,435 +1,239 @@
-// ===== Helper functions =====
-function encodeUrl(url) {
-  return btoa(url)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+// Cloudflare Worker - Streaming Proxy with HLS support
+// Deploy and use like: https://your-worker.workers.dev/https://example.com/video.m3u8
+
+addEventListener('fetch', event => {
+  event.respondWith(handleRequest(event.request));
+});
+
+// Helper: rewrite URLs inside HTML and CSS
+class UrlRewriter {
+  constructor(baseUrl, proxyBase) {
+    this.baseUrl = baseUrl;      // original page URL (absolute)
+    this.proxyBase = proxyBase;  // base URL of the proxy (e.g., https://worker.com)
+  }
+
+  // Rewrite a single URL
+  rewrite(url) {
+    if (!url) return url;
+    if (/^(javascript:|data:|mailto:|#|blob:|about:)/i.test(url)) return url;
+    if (url.startsWith(this.proxyBase)) return url; // already proxied
+
+    let absolute;
+    try {
+      absolute = new URL(url, this.baseUrl).href;
+    } catch (e) {
+      return url;
+    }
+    return `${this.proxyBase}/${absolute}`;
+  }
+
+  // Rewrite srcset attribute
+  rewriteSrcset(srcset) {
+    if (!srcset) return srcset;
+    return srcset.split(',').map(part => {
+      const [url, ...rest] = part.trim().split(/\s+/);
+      if (!url) return part;
+      return [this.rewrite(url), ...rest].join(' ');
+    }).join(', ');
+  }
+
+  // Rewrite inline styles (url(...))
+  rewriteStyle(style) {
+    if (!style) return style;
+    return style.replace(/url\((['"]?)(.*?)\1\)/gi, (match, quote, url) => {
+      if (!url || /^(javascript:|data:|#)/i.test(url)) return match;
+      const rewritten = this.rewrite(url);
+      return `url(${quote}${rewritten}${quote})`;
+    });
+  }
+
+  element(el) {
+    const attrs = ['href', 'src', 'action', 'poster', 'data-src', 'data-href'];
+    for (const attr of attrs) {
+      const value = el.getAttribute(attr);
+      if (value) el.setAttribute(attr, this.rewrite(value));
+    }
+    const srcset = el.getAttribute('srcset');
+    if (srcset) el.setAttribute('srcset', this.rewriteSrcset(srcset));
+    const style = el.getAttribute('style');
+    if (style) el.setAttribute('style', this.rewriteStyle(style));
+  }
 }
 
-function decodeUrl(hash) {
-  let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
-  while (base64.length % 4) base64 += '=';
-  return atob(base64);
-}
-
-export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    const baseUrl = url.origin;
-    const isEmbed = url.searchParams.get('embed') === '1';
-
-    // ----- oEmbed endpoint (FIXED) -----
-    if (url.pathname === '/oembed') {
-      const requestedUrl = url.searchParams.get('url') || '';
-      console.log('oEmbed requested for:', requestedUrl);
-
-      let hash = '';
-      let videoUrl = '';
-      try {
-        const reqUrl = new URL(requestedUrl);
-        if (reqUrl.pathname.startsWith('/watch/')) {
-          hash = reqUrl.pathname.split('/watch/')[1];
-          videoUrl = hash ? decodeUrl(hash) : '';
-        }
-      } catch {
-        // invalid URL
-      }
-
-      // If no hash, return a fallback
-      if (!hash) {
-        return new Response(JSON.stringify({
-          version: '1.0',
-          type: 'rich',
-          provider_name: 'MyPlayer',
-          provider_url: baseUrl,
-          title: 'Video Player',
-          html: `<p>Invalid video link</p>`,
-          width: 640,
-          height: 400
-        }), {
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Cache-Control': 'no-cache'
-          }
+// Rewrite M3U8 playlists (HLS)
+function rewriteM3U8(content, baseUrl, proxyBase) {
+  const lines = content.split('\n');
+  const rewritten = lines.map(line => {
+    line = line.trim();
+    if (!line || line.startsWith('#')) {
+      // Handle #EXT-X-KEY URI, #EXT-X-MEDIA URI, etc.
+      if (line.startsWith('#EXT-X-KEY') || line.startsWith('#EXT-X-MEDIA') || line.startsWith('#EXT-X-MAP')) {
+        return line.replace(/URI="([^"]*)"/i, (match, uri) => {
+          const abs = new URL(uri, baseUrl).href;
+          return `URI="${proxyBase}/${abs}"`;
         });
       }
+      return line;
+    }
+    // Segment line – must be a URL
+    const abs = new URL(line, baseUrl).href;
+    return `${proxyBase}/${abs}`;
+  });
+  return rewritten.join('\n');
+}
 
-      const iframeSrc = `${baseUrl}/watch/${hash}?embed=1`;
-      const iframeHtml = `<iframe src="${iframeSrc}" width="640" height="400" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+// Main handler
+async function handleRequest(request) {
+  const url = new URL(request.url);
+  const proxyBase = `${url.protocol}//${url.host}`;
 
-      return new Response(JSON.stringify({
-        version: '1.0',
-        type: 'rich',
-        provider_name: 'MyPlayer',
-        provider_url: baseUrl,
-        title: videoUrl ? videoUrl.split('/').pop() : 'Video Player',
-        html: iframeHtml,
-        width: 640,
-        height: 400,
-        thumbnail_url: 'https://via.placeholder.com/640x360/1DB954/000000?text=Video',
-        thumbnail_width: 640,
-        thumbnail_height: 360,
-        cache_age: 86400 // 24h
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'no-cache'
-        }
+  // If request is to root, show a simple form
+  if (url.pathname === '/' && request.method === 'GET') {
+    return new Response(getLandingPage(), {
+      headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+    });
+  }
+
+  // Parse target URL from the path
+  // Path format: /https://example.com/path
+  let targetPath = url.pathname.slice(1); // remove leading slash
+  if (!targetPath) {
+    return new Response('Missing target URL. Usage: ' + proxyBase + '/https://example.com', { status: 400 });
+  }
+  // Reconstruct full target URL
+  let targetUrl;
+  try {
+    targetUrl = new URL(targetPath);
+    if (!['http:', 'https:'].includes(targetUrl.protocol)) {
+      throw new Error('Unsupported protocol');
+    }
+  } catch (e) {
+    return new Response('Invalid target URL: ' + e.message, { status: 400 });
+  }
+
+  // Merge query parameters from the proxy URL to the target URL (except 'url' param)
+  url.searchParams.forEach((value, key) => {
+    if (key !== 'url') targetUrl.searchParams.set(key, value);
+  });
+
+  // Prepare request headers: forward most, but set Host to target
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('Host', targetUrl.host);
+  // Remove proxy-specific headers
+  requestHeaders.delete('cf-connecting-ip');
+  requestHeaders.delete('cf-ray');
+  requestHeaders.delete('x-forwarded-for');
+  requestHeaders.delete('x-forwarded-proto');
+
+  const fetchOptions = {
+    method: request.method,
+    headers: requestHeaders,
+    body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
+    redirect: 'follow',
+  };
+
+  try {
+    const response = await fetch(targetUrl.href, fetchOptions);
+
+    // Copy response headers
+    const responseHeaders = new Headers(response.headers);
+    // Remove problematic headers
+    responseHeaders.delete('content-security-policy');
+    responseHeaders.delete('content-security-policy-report-only');
+    responseHeaders.delete('x-frame-options');
+    responseHeaders.delete('strict-transport-security');
+    responseHeaders.set('access-control-allow-origin', '*');
+    responseHeaders.set('x-proxied-by', 'cloudflare-worker-streaming-proxy');
+
+    const contentType = responseHeaders.get('content-type') || '';
+
+    // Handle different content types
+    if (contentType.includes('text/html')) {
+      // HTML: rewrite URLs and inject <base>
+      const originalHtml = await response.text();
+      const rewriter = new HTMLRewriter()
+        .on('a[href]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('link[href]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('script[src]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('img[src]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('img[srcset]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('form[action]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('source[src]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('source[srcset]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('video[poster]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('audio[src]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('iframe[src]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('object[data]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('embed[src]', new UrlRewriter(targetUrl.href, proxyBase))
+        .on('[style]', new UrlRewriter(targetUrl.href, proxyBase));
+
+      // Inject <base> tag as first element in <head>
+      let htmlWithBase = originalHtml.replace(/<head([^>]*)>/i, `<head$1><base href="${proxyBase}/${targetUrl.href}">`);
+      const rewrittenHtml = rewriter.transform(htmlWithBase);
+      return new Response(rewrittenHtml, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+      });
+    } else if (contentType.includes('application/vnd.apple.mpegurl') || contentType.includes('application/x-mpegurl') || targetUrl.pathname.endsWith('.m3u8')) {
+      // HLS playlist: rewrite segment URLs
+      const originalPlaylist = await response.text();
+      const rewrittenPlaylist = rewriteM3U8(originalPlaylist, targetUrl.href, proxyBase);
+      return new Response(rewrittenPlaylist, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+      });
+    } else {
+      // All other content: stream as-is
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
       });
     }
+  } catch (error) {
+    return new Response('Proxy error: ' + error.message, { status: 502 });
+  }
+}
 
-    // ----- Main player page (unchanged, but I'll include it for completeness) -----
-    let videoUrl = '';
-    let hash = '';
-
-    if (url.pathname.startsWith('/watch/')) {
-      hash = url.pathname.split('/watch/')[1];
-      if (hash) {
-        try {
-          videoUrl = decodeUrl(hash);
-        } catch {
-          videoUrl = '';
-        }
-      }
-    }
-
-    if (!videoUrl) {
-      const direct = url.searchParams.get('video');
-      if (direct) {
-        videoUrl = direct;
-      }
-    }
-
-    const title = videoUrl ? videoUrl.split('/').pop() : 'My Video Player';
-    const thumbnail = url.searchParams.get('thumb') || 'https://via.placeholder.com/640x360/1DB954/000000?text=Video';
-    const pageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
-    const oembedPageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
-
-    const htmlTemplate = `<!DOCTYPE html>
-<html lang="en">
+function getLandingPage() {
+  return `<!DOCTYPE html>
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>__TITLE__</title>
-
-    <meta property="og:title" content="__TITLE__" />
-    <meta property="og:description" content="Watch this video on MyPlayer" />
-    <meta property="og:image" content="__THUMBNAIL__" />
-    <meta property="og:url" content="__PAGE_URL__" />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-
-    <!-- oEmbed discovery link (absolute URL) -->
-    <link rel="alternate" type="application/json+oembed" 
-          href="__BASE_URL__/oembed?url=__ENCODED_PAGE_URL__" />
-
-    <style>
-      /* (your existing styles – omitted for brevity, but keep them as they are) */
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body {
-        background-color: #141414;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-        font-family: sans-serif;
-        padding: 20px;
-      }
-      .main-container {
-        width: 100%;
-        max-width: 800px;
-        background: #000;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-      }
-      .player-wrapper {
-        position: relative;
-        background: #000;
-        aspect-ratio: 16 / 9;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        touch-action: none;
-      }
-      .player-wrapper video {
-        width: 100%;
-        height: 100%;
-        display: block;
-        object-fit: contain;
-        background: #000;
-        touch-action: none;
-      }
-
-      .controls {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: rgba(0, 0, 0, 0.7);
-        display: flex;
-        align-items: center;
-        padding: 8px 12px;
-        gap: 10px;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-        pointer-events: none;
-      }
-      .controls.controls-show {
-        opacity: 1;
-        pointer-events: auto;
-      }
-
-      .progress-wrapper {
-        flex: 1;
-        position: relative;
-        height: 4px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-      }
-      .progress-track {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 4px;
-        background: #333 !important;
-        border-radius: 2px;
-        pointer-events: none;
-      }
-      .progress-loaded {
-        position: absolute;
-        left: 0;
-        top: 0;
-        height: 4px;
-        background: #ffffff !important;
-        border-radius: 2px;
-        pointer-events: none;
-        width: 0%;
-        z-index: 1;
-      }
-      .progress-played {
-        position: absolute;
-        left: 0;
-        top: 0;
-        height: 4px;
-        background: #ff0000 !important;
-        border-radius: 2px;
-        pointer-events: none;
-        width: 0%;
-        z-index: 2;
-      }
-      .progress-input {
-        position: relative;
-        width: 100%;
-        height: 4px;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        background: transparent !important;
-        z-index: 3;
-        cursor: pointer;
-        margin: 0;
-        padding: 0;
-        outline: none;
-        border: none !important;
-      }
-      .progress-input::-webkit-slider-track {
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        background: transparent !important;
-        height: 4px;
-        border: none !important;
-      }
-      .progress-input::-moz-range-track {
-        -moz-appearance: none !important;
-        appearance: none !important;
-        background: transparent !important;
-        height: 4px;
-        border: none !important;
-      }
-      .progress-input::-webkit-slider-thumb {
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        width: 14px !important;
-        height: 14px !important;
-        border-radius: 50% !important;
-        background: #ffffff !important;
-        cursor: pointer !important;
-        margin-top: -5px !important;
-        border: 2px solid #ff0000 !important;
-        box-shadow: 0 0 6px rgba(0,0,0,0.6) !important;
-        z-index: 5 !important;
-      }
-      .progress-input::-moz-range-thumb {
-        -moz-appearance: none !important;
-        appearance: none !important;
-        width: 14px !important;
-        height: 14px !important;
-        border-radius: 50% !important;
-        background: #ffffff !important;
-        cursor: pointer !important;
-        border: 2px solid #ff0000 !important;
-        box-shadow: 0 0 6px rgba(0,0,0,0.6) !important;
-        z-index: 5 !important;
-      }
-
-      button {
-        background: none;
-        border: none;
-        color: #fff;
-        font-size: 16px;
-        cursor: pointer;
-        padding: 4px 6px;
-      }
-      .volume-container {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-      #volume {
-        width: 60px;
-        accent-color: #ffffff;
-        background: transparent;
-        height: 4px;
-      }
-
-      .url-bar {
-        padding: 8px 12px;
-        background: #222;
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        border-top: 1px solid #333;
-      }
-      .url-bar label {
-        color: #aaa;
-        font-size: 12px;
-        font-weight: 600;
-        white-space: nowrap;
-      }
-      .url-bar input[type="text"] {
-        flex: 1;
-        padding: 6px 10px;
-        border: 1px solid #444;
-        border-radius: 4px;
-        background: #111;
-        color: #fff;
-        font-size: 13px;
-        outline: none;
-        transition: border 0.2s;
-      }
-      .url-bar input[type="text"]:focus {
-        border-color: #1DB954;
-      }
-      .url-bar button {
-        background: #1DB954;
-        color: #fff;
-        padding: 6px 14px;
-        border-radius: 4px;
-        font-weight: bold;
-        border: none;
-        cursor: pointer;
-        font-size: 13px;
-        transition: background 0.2s;
-      }
-      .url-bar button:hover {
-        background: #1ed760;
-      }
-
-      .empty-message {
-        color: #aaa;
-        font-size: 18px;
-        text-align: center;
-        background: #111;
-        padding: 40px;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 12px;
-      }
-      .empty-message span {
-        font-size: 48px;
-      }
-
-      .embed-mode .url-bar {
-        display: none !important;
-      }
-      .embed-mode .main-container {
-        border-radius: 0;
-        box-shadow: none;
-      }
-      body.embed-mode {
-        padding: 0;
-        background: #000;
-      }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Streaming Proxy</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f0f0; }
+    .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; max-width: 500px; width: 90%; }
+    input[type="text"] { width: 100%; padding: 0.75rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; }
+    button { margin-top: 1rem; padding: 0.75rem 1.5rem; font-size: 1rem; background: #0070f3; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #0051a8; }
+    .note { font-size: 0.85rem; color: #666; margin-top: 1rem; }
+    code { background: #eee; padding: 0.2rem 0.4rem; border-radius: 3px; }
+  </style>
 </head>
-<body class="__BODY_CLASS__">
-  <div class="main-container">
-    <div class="player-wrapper">
-      <video id="video" src="__VIDEO_URL__"></video>
-      <div class="controls" id="controls">
-        <button id="play-btn">▶</button>
-        <button id="skip-back-btn" title="Skip backward 10 seconds">⏪</button>
-        <button id="skip-forward-btn" title="Skip forward 10 seconds">⏩</button>
-        <div class="progress-wrapper" id="progressWrapper">
-          <div class="progress-track" id="progressTrack"></div>
-          <div class="progress-loaded" id="progressLoaded"></div>
-          <div class="progress-played" id="progressPlayed"></div>
-          <input type="range" class="progress-input" id="progressInput" min="0" max="100" value="0">
-        </div>
-        <div class="volume-container">
-          <button id="mute-btn">🔊</button>
-          <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
-        </div>
-      </div>
-      <div id="emptyState" class="empty-message" style="display: __EMPTY_DISPLAY__; position: absolute; top:0; left:0; right:0; bottom:0; background: #111;">
-        <span>🎬</span>
-        <div>No video loaded</div>
-        <div style="font-size:14px; color:#666;">Paste a URL below and click "Load"</div>
-      </div>
-    </div>
-    <div class="url-bar">
-      <label>🔗 Video URL</label>
-      <input type="text" id="videoUrlInput" placeholder="https://example.com/video.mp4" value="__VIDEO_URL__">
-      <button id="load-btn">Load</button>
-    </div>
+<body>
+  <div class="container">
+    <h1>Streaming Proxy</h1>
+    <p>Enter a direct video URL (e.g., <code>.m3u8</code> or <code>.mp4</code>) or a simple streaming page.</p>
+    <form id="proxyForm">
+      <input type="text" id="urlInput" placeholder="https://example.com/stream.m3u8" required>
+      <button type="submit">Go</button>
+    </form>
+    <p class="note">Usage: <code>https://your-worker.workers.dev/https://example.com/path</code><br>
+    Complex sites (YouTube, Twitch) will NOT work due to JavaScript and WebSocket limitations.</p>
   </div>
   <script>
-    // ===== (Your existing JavaScript – unchanged) =====
-    // ... keep the full script from your last working version ...
-    // I'll include it but for brevity I'm assuming it's the same as before
+    document.getElementById('proxyForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      let input = document.getElementById('urlInput').value.trim();
+      if (!input) return;
+      if (!/^https?:\\/\\//i.test(input)) input = 'https://' + input;
+      window.location.href = '/' + input;
+    });
   </script>
 </body>
 </html>`;
-
-    // ... (rest of the worker with placeholders and response)
-
-    // Determine body class
-    const bodyClass = isEmbed ? 'embed-mode' : '';
-
-    let html = htmlTemplate
-      .replace(/__VIDEO_URL__/g, videoUrl.replace(/"/g, '&quot;'))
-      .replace(/__TITLE__/g, title.replace(/"/g, '&quot;'))
-      .replace(/__THUMBNAIL__/g, thumbnail)
-      .replace(/__PAGE_URL__/g, pageUrl)
-      .replace(/__ENCODED_PAGE_URL__/g, encodeURIComponent(oembedPageUrl))
-      .replace(/__BASE_URL__/g, baseUrl)
-      .replace(/__EMPTY_DISPLAY__/g, videoUrl ? 'none' : 'flex')
-      .replace(/__BODY_CLASS__/g, bodyClass);
-
-    return new Response(html, {
-      headers: {
-        'Content-Type': 'text/html',
-        'Cache-Control': 'no-cache, no-store, must-revalidate'
       }
-    });
-  }
-};
