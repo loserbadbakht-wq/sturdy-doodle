@@ -138,7 +138,7 @@ const html = `<!DOCTYPE html>
       padding: 1rem;
       transition: border-color var(--transition);
     }
-    .stream-item:hover { border-color: #444; }
+    .stream-item:hover { border-color: var(--accent); } /* changed to purple */
     .stream-item label {
       margin-bottom: 0.5rem;
       font-size: 0.85rem;
