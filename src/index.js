@@ -1,4 +1,4 @@
-// Cloudflare Worker: Twitch → m3u8 URL generator (AMOLED theme + copy buttons)
+// Cloudflare Worker: Twitch → m3u8 URL generator (AMOLED + responsive: PC horizontal, mobile stacked)
 
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 const GQL_URL = 'https://gql.twitch.tv/gql';
@@ -21,7 +21,6 @@ const PLAYBACK_ACCESS_TOKEN_QUERY = {
   }
 };
 
-// AMOLED-friendly, modern HTML page
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,7 +53,7 @@ const html = `<!DOCTYPE html>
     }
     .container {
       width: 100%;
-      max-width: 720px;
+      max-width: 800px;
       background: var(--surface);
       border-radius: var(--radius);
       padding: 2rem;
@@ -138,7 +137,7 @@ const html = `<!DOCTYPE html>
       padding: 1rem;
       transition: border-color var(--transition);
     }
-    .stream-item:hover { border-color: var(--accent); } /* changed to purple */
+    .stream-item:hover { border-color: var(--accent); } /* purple hover border */
     .stream-item label {
       margin-bottom: 0.5rem;
       font-size: 0.85rem;
@@ -174,6 +173,67 @@ const html = `<!DOCTYPE html>
       text-align: center;
       color: var(--text-secondary);
       font-size: 0.8rem;
+    }
+
+    /* ===== Mobile (stacked) layout ===== */
+    @media (max-width: 600px) {
+      body {
+        padding: 0.5rem;
+        align-items: flex-start;
+      }
+      .container {
+        padding: 1.2rem;
+        border-radius: 6px;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      .subtitle {
+        font-size: 0.85rem;
+        margin-bottom: 1.5rem;
+      }
+      .input-row {
+        flex-direction: column;   /* stack vertically */
+      }
+      .input-row input[type="text"] {
+        width: 100%;
+      }
+      .input-row button {
+        width: 100%;
+      }
+      .url-row {
+        flex-direction: column;   /* stack URL and copy button */
+        align-items: stretch;
+      }
+      .url-row input[type="text"] {
+        width: 100%;
+      }
+      .url-row .copy-btn {
+        width: 100%;
+      }
+      .stream-item {
+        padding: 0.8rem;
+      }
+      label {
+        font-size: 0.8rem;
+      }
+      footer {
+        font-size: 0.75rem;
+      }
+    }
+
+    /* ===== PC (desktop) horizontal layout ===== */
+    @media (min-width: 601px) {
+      .input-row {
+        flex-direction: row;      /* horizontal */
+      }
+      .url-row {
+        flex-direction: row;      /* horizontal */
+      }
+      /* Optional: slightly larger max-width for better spacing */
+      .container {
+        max-width: 800px;
+      }
     }
   </style>
 </head>
@@ -242,7 +302,6 @@ const html = `<!DOCTYPE html>
                 copyBtn.classList.remove('copied');
               }, 1500);
             }).catch(err => {
-              // Fallback for older browsers
               input.select();
               document.execCommand('copy');
               copyBtn.textContent = 'Copied!';
