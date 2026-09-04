@@ -290,11 +290,6 @@ async function handleRequest(request) {
   // Determine target URL
   let targetUrl;
   try {
-    // Check domain whitelist
-    if (config.allowedDomains.length > 0) {
-      // We'll check later after parsing targetUrl
-    }
-
     // Parse target URL from path
     let targetPath = url.pathname.slice(1);
     if (!targetPath) {
@@ -325,11 +320,26 @@ async function handleRequest(request) {
         if (resolved) {
           targetUrl = resolved;
         } else {
-          // Treat as search keyword
-          const q = encodeURIComponent(targetPath);
-          targetUrl = new URL(`https://duckduckgo.com/?q=${q}${url.search ? '&' + url.search.substring(1) : ''}`);
+          // No Referer or resolution failed
+          // Decide: if path contains a dot and no slash, treat as domain
+          if (targetPath.includes('.') && !targetPath.includes('/')) {
+            // Looks like a domain (e.g., example.com), prepend https://
+            targetUrl = new URL('https://' + targetPath);
+          } else {
+            // Treat as search keyword on DuckDuckGo
+            const q = encodeURIComponent(targetPath);
+            targetUrl = new URL(`https://duckduckgo.com/?q=${q}${url.search ? '&' + url.search.substring(1) : ''}`);
+          }
         }
       }
+    }
+
+    // Merge query parameters from proxy URL to target URL (except 'q' if used for search)
+    // We already handled search query above; for direct URLs, append other params.
+    if (targetPath && (targetPath.startsWith('http://') || targetPath.startsWith('https://')) && url.searchParams.toString()) {
+      url.searchParams.forEach((value, key) => {
+        if (key !== 'url') targetUrl.searchParams.set(key, value);
+      });
     }
 
     // Domain whitelist check
@@ -382,7 +392,6 @@ async function handleRequest(request) {
 
     // Copy and clean response headers
     const responseHeaders = new Headers(response.headers);
-    // Remove problematic headers
     responseHeaders.delete('content-security-policy');
     responseHeaders.delete('content-security-policy-report-only');
     responseHeaders.delete('x-frame-options');
@@ -577,4 +586,4 @@ function getErrorPage(error, targetUrl) {
   <div class="details">Request URL: ${targetUrl}\nTime: ${new Date().toISOString()}</div>
 </body>
 </html>`;
-      }
+  }
