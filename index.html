@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Twitch → M3U8</title>
+    <style>
+        /* ── reset & base ── */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0e0e10;
+            color: #efeff1;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1.5rem;
+            margin: 0;
+        }
+        .card {
+            background: #1f1f23;
+            border-radius: 1.25rem;
+            padding: 2.5rem 2.2rem;
+            max-width: 680px;
+            width: 100%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            border: 1px solid #2a2a2e;
+            transition: border-color 0.2s;
+        }
+        .card:hover {
+            border-color: #3a3a3e;
+        }
+
+        /* ── header ── */
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 0.25rem;
+        }
+        .logo svg {
+            width: 32px;
+            height: 32px;
+            fill: #9146ff;
+        }
+        .logo h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #9146ff 0%, #a970ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .sub {
+            color: #adadb8;
+            font-size: 0.9rem;
+            margin-bottom: 1.8rem;
+            border-left: 3px solid #9146ff;
+            padding-left: 0.9rem;
+        }
+
+        /* ── input row ── */
+        .input-row {
+            display: flex;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+        .input-row input {
+            flex: 1;
+            min-width: 180px;
+            background: #0e0e10;
+            border: 1px solid #3a3a3e;
+            border-radius: 0.75rem;
+            padding: 0.8rem 1.1rem;
+            color: #efeff1;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.25s, box-shadow 0.25s;
+        }
+        .input-row input::placeholder {
+            color: #6a6a72;
+        }
+        .input-row input:focus {
+            border-color: #9146ff;
+            box-shadow: 0 0 0 3px rgba(145, 70, 255, 0.25);
+        }
+        .input-row button {
+            background: #9146ff;
+            border: none;
+            border-radius: 0.75rem;
+            padding: 0.8rem 1.8rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .input-row button:hover {
+            background: #a55aff;
+        }
+        .input-row button:active {
+            transform: scale(0.97);
+        }
+        .input-row button:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* ── status / error ── */
+        .status {
+            margin-top: 1.2rem;
+            padding: 0.7rem 1rem;
+            border-radius: 0.6rem;
+            font-size: 0.95rem;
+            display: none;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .status.show {
+            display: flex;
+        }
+        .status.error {
+            background: #2a1215;
+            border: 1px solid #6a1a22;
+            color: #f28b8b;
+        }
+        .status.success {
+            background: #0f2218;
+            border: 1px solid #1a4a2e;
+            color: #7ddfa0;
+        }
+        .status.loading {
+            background: #14161f;
+            border: 1px solid #2a2e4a;
+            color: #aab0ff;
+        }
+        .status .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2.5px solid #3a3a5e;
+            border-top-color: #9146ff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            flex-shrink: 0;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ── result box ── */
+        .result {
+            margin-top: 1.5rem;
+            display: none;
+            animation: fadeUp 0.3s ease;
+        }
+        .result.show {
+            display: block;
+        }
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #8a8a92;
+            margin-bottom: 0.4rem;
+        }
+        .url-box {
+            background: #0e0e10;
+            border: 1px solid #2e2e32;
+            border-radius: 0.75rem;
+            padding: 0.9rem 1.1rem;
+            font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+            color: #b8b8c8;
+            line-height: 1.5;
+            max-height: 180px;
+            overflow-y: auto;
+            position: relative;
+            user-select: all;
+        }
+        .url-box::-webkit-scrollbar {
+            width: 4px;
+        }
+        .url-box::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .url-box::-webkit-scrollbar-thumb {
+            background: #3a3a4a;
+            border-radius: 10px;
+        }
+
+        .result-actions {
+            display: flex;
+            gap: 0.6rem;
+            margin-top: 0.9rem;
+            flex-wrap: wrap;
+        }
+        .result-actions button,
+        .result-actions a {
+            background: #2a2a2e;
+            border: none;
+            border-radius: 0.6rem;
+            padding: 0.5rem 1.2rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #efeff1;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .result-actions button:hover,
+        .result-actions a:hover {
+            background: #3a3a3e;
+        }
+        .result-actions .primary-btn {
+            background: #9146ff;
+        }
+        .result-actions .primary-btn:hover {
+            background: #a55aff;
+        }
+        .result-actions .copy-btn.copied {
+            background: #1a4a2e;
+            color: #7ddfa0;
+        }
+
+        /* ── channel badge ── */
+        .channel-badge {
+            display: inline-block;
+            background: #2a2a2e;
+            border-radius: 2rem;
+            padding: 0.2rem 0.9rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #adadb8;
+            margin-top: 0.5rem;
+        }
+        .channel-badge span {
+            color: #efeff1;
+            font-weight: 600;
+        }
+
+        /* ── responsive ── */
+        @media (max-width: 500px) {
+            .card {
+                padding: 1.5rem 1.2rem;
+            }
+            .logo h1 {
+                font-size: 1.3rem;
+            }
+            .input-row {
+                flex-direction: column;
+            }
+            .input-row button {
+                justify-content: center;
+                padding: 0.7rem;
+            }
+            .result-actions {
+                flex-direction: column;
+            }
+            .result-actions a,
+            .result-actions button {
+                justify-content: center;
+            }
+        }
+
+        /* ── footer ── */
+        .footer {
+            margin-top: 2rem;
+            font-size: 0.7rem;
+            color: #4a4a52;
+            text-align: center;
+            border-top: 1px solid #1a1a1e;
+            padding-top: 1.2rem;
+            letter-spacing: 0.02em;
+        }
+        .footer a {
+            color: #6a6a7a;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            color: #9146ff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+
+        <!-- header -->
+        <div class="logo">
+            <svg viewBox="0 0 24 24"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>
+            <h1>Twitch → M3U8</h1>
+        </div>
+        <div class="sub">Paste any Twitch channel URL &amp; get the live HLS stream link</div>
+
+        <!-- input -->
+        <form id="form" class="input-row">
+            <input
+            id="input"
+            type="text"
+            placeholder="e.g. https://www.twitch.tv/shroud"
+            autocomplete="off"
+            spellcheck="false"
+            />
+            <button type="submit" id="submitBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                Get M3U8
+            </button>
+        </form>
+
+        <!-- status -->
+        <div id="status" class="status">
+            <span id="statusIcon"></span>
+            <span id="statusMsg"></span>
+        </div>
+
+        <!-- result -->
+        <div id="result" class="result">
+            <div class="result-label">📺 M3U8 Stream URL</div>
+            <div id="urlBox" class="url-box"></div>
+            <div id="channelBadge" class="channel-badge"></div>
+            <div class="result-actions">
+                <button id="copyBtn" class="copy-btn">📋 Copy</button>
+                <a id="openBtn" class="primary-btn" href="#" target="_blank" rel="noopener">▶ Open in player</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            Uses Twitch's public GQL API &bull; for live streams only
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ─── DOM refs ────────────────────────────────────────────────
+            const form = document.getElementById('form');
+            const input = document.getElementById('input');
+            const submitBtn = document.getElementById('submitBtn');
+            const statusEl = document.getElementById('status');
+            const statusMsg = document.getElementById('statusMsg');
+            const statusIcon = document.getElementById('statusIcon');
+            const resultEl = document.getElementById('result');
+            const urlBox = document.getElementById('urlBox');
+            const channelBadge = document.getElementById('channelBadge');
+            const copyBtn = document.getElementById('copyBtn');
+            const openBtn = document.getElementById('openBtn');
+
+            let currentUrl = '';
+
+            // ─── constants ──────────────────────────────────────────────
+            const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
+            const USER_AGENT =
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
+
+            // ─── helpers ────────────────────────────────────────────────
+            function showStatus(message, type = 'loading') {
+                statusEl.className = 'status show ' + type;
+                statusMsg.textContent = message;
+                if (type === 'loading') {
+                    statusIcon.innerHTML = '<span class="spinner"></span>';
+                } else if (type === 'error') {
+                    statusIcon.innerHTML = '⚠️';
+                } else {
+                    statusIcon.innerHTML = '✅';
+                }
+            }
+
+            function hideStatus() {
+                statusEl.className = 'status';
+                statusMsg.textContent = '';
+                statusIcon.innerHTML = '';
+            }
+
+            function showResult(url, channel) {
+                currentUrl = url;
+                urlBox.textContent = url;
+                channelBadge.innerHTML = 'Channel: <span>' + channel + '</span>';
+                resultEl.className = 'result show';
+                openBtn.href = url;
+                // reset copy button
+                copyBtn.textContent = '📋 Copy';
+                copyBtn.className = 'copy-btn';
+            }
+
+            function hideResult() {
+                resultEl.className = 'result';
+                urlBox.textContent = '';
+                channelBadge.innerHTML = '';
+                currentUrl = '';
+            }
+
+            function extractChannel(text) {
+                if (!text) return null;
+                const trimmed = text.trim();
+                // try to parse as URL
+                try {
+                    const url = new URL(trimmed);
+                    if (url.hostname.includes('twitch.tv')) {
+                        const parts = url.pathname.split('/').filter(Boolean);
+                        if (parts.length > 0) return parts[0];
+                    }
+                } catch (_) {
+                    // not a valid URL, treat as raw channel name
+                }
+                // if it looks like a channel name (alphanumeric + underscore)
+                if (/^[a-zA-Z0-9_]{4,25}$/.test(trimmed)) {
+                    return trimmed;
+                }
+                // try to extract from a twitch.tv/... pattern
+                const match = trimmed.match(/(?:twitch\.tv\/)([a-zA-Z0-9_]{4,25})/i);
+                if (match) return match[1];
+                return null;
+            }
+
+            function isValidChannel(channel) {
+                return typeof channel === 'string' && /^[a-zA-Z0-9_]{4,25}$/.test(channel);
+            }
+
+            function generateSessionId() {
+                return Math.random().toString(36).substring(2, 15) +
+                    Math.random().toString(36).substring(2, 15);
+            }
+
+            // ─── core: fetch token & build M3U8 ──────────────────────
+
+            async function fetchM3u8(channel) {
+                const variables = {
+                    isLive: true,
+                    login: channel,
+                    isVod: false,
+                    vodID: '',
+                    playerType: 'site',
+                    platform: 'web'
+                };
+
+                const query = `
+                    query PlaybackAccessToken_Template(
+                        $login: String!,
+                        $isLive: Boolean!,
+                        $vodID: ID!,
+                        $isVod: Boolean!,
+                        $playerType: String!,
+                        $platform: String!
+                    ) {
+                        streamPlaybackAccessToken(
+                            channelName: $login,
+                            params: {
+                                platform: $platform,
+                                playerBackend: "mediaplayer",
+                                playerType: $playerType
+                            }
+                        ) @include(if: $isLive) {
+                            value
+                            signature
+                            authorization {
+                                isForbidden
+                                forbiddenReasonCode
+                            }
+                            __typename
+                        }
+                        videoPlaybackAccessToken(
+                            id: $vodID,
+                            params: {
+                                platform: $platform,
+                                playerBackend: "mediaplayer",
+                                playerType: $playerType
+                            }
+                        ) @include(if: $isVod) {
+                            value
+                            signature
+                            __typename
+                        }
+                    }
+                `;
+
+                const payload = {
+                    operationName: 'PlaybackAccessToken_Template',
+                    query: query,
+                    variables: variables
+                };
+
+                const response = await fetch('https://gql.twitch.tv/gql', {
+                    method: 'POST',
+                    headers: {
+                        'Client-ID': CLIENT_ID,
+                        'User-Agent': USER_AGENT,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network error: ' + response.status + ' ' + response.statusText);
+                }
+
+                const json = await response.json();
+                const data = json?.data?.streamPlaybackAccessToken;
+
+                if (!data) {
+                    throw new Error('Unexpected API response — missing stream token data.');
+                }
+
+                if (data.authorization?.isForbidden === true) {
+                    const reason = data.authorization?.forbiddenReasonCode || 'unknown reason';
+                    throw new Error('Stream unavailable: ' + reason + '. Channel may be offline or geo-restricted.');
+                }
+
+                const signature = data.signature;
+                const token = data.value;
+
+                if (!signature || !token) {
+                    throw new Error('Missing signature or token in API response.');
+                }
+
+                // ── build M3U8 URL ──
+                const sessionId = generateSessionId();
+                const sigEnc = encodeURIComponent(signature);
+                const tokenEnc = encodeURIComponent(token);
+
+                const url =
+                    'https://usher.ttvnw.net/api/channel/hls/' +
+                    channel + '.m3u8?' +
+                    'acmb=' + sessionId +
+                    '&allow_source=true' +
+                    '&browser_family=chrome' +
+                    '&browser_version=136.0' +
+                    '&cdm=wv' +
+                    '&enable_score=true' +
+                    '&fast_bread=true' +
+                    '&os_name=macOS' +
+                    '&os_version=10.15.7' +
+                    '&p=1337' +
+                    '&platform=web' +
+                    '&play_session_id=' + sessionId +
+                    '&player_backend=mediaplayer' +
+                    '&player_version=1.41.0-rc.1' +
+                    '&playlist_include_framerate=true' +
+                    '&reassignments_supported=true' +
+                    '&sig=' + sigEnc +
+                    '&supported_codecs=av1,h265,h264' +
+                    '&token=' + tokenEnc +
+                    '&transcode_mode=cbr_v1';
+
+                return url;
+            }
+
+            // ─── main action ────────────────────────────────────────────
+
+            async function handleSubmit(e) {
+                e.preventDefault();
+
+                const raw = input.value.trim();
+                if (!raw) {
+                    showStatus('Please enter a Twitch channel URL or name.', 'error');
+                    hideResult();
+                    return;
+                }
+
+                const channel = extractChannel(raw);
+                if (!channel || !isValidChannel(channel)) {
+                    showStatus(
+                        'Invalid channel name. Must be 4–25 characters (letters, numbers, underscores).',
+                        'error'
+                    );
+                    hideResult();
+                    return;
+                }
+
+                // disable button, show loading
+                submitBtn.disabled = true;
+                hideResult();
+                showStatus('Fetching stream token for @' + channel + ' …', 'loading');
+
+                try {
+                    const url = await fetchM3u8(channel);
+                    hideStatus();
+                    showResult(url, channel);
+                    // prefetch the URL to warm the cache (optional)
+                    // no-op
+                } catch (err) {
+                    showStatus('Error: ' + err.message, 'error');
+                    hideResult();
+                } finally {
+                    submitBtn.disabled = false;
+                }
+            }
+
+            // ─── copy ───────────────────────────────────────────────────
+
+            copyBtn.addEventListener('click', async function() {
+                if (!currentUrl) return;
+                try {
+                    await navigator.clipboard.writeText(currentUrl);
+                    copyBtn.textContent = '✅ Copied!';
+                    copyBtn.className = 'copy-btn copied';
+                    setTimeout(() => {
+                        copyBtn.textContent = '📋 Copy';
+                        copyBtn.className = 'copy-btn';
+                    }, 2500);
+                } catch (_) {
+                    // fallback
+                    const textarea = document.createElement('textarea');
+                    textarea.value = currentUrl;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    textarea.remove();
+                    copyBtn.textContent = '✅ Copied!';
+                    copyBtn.className = 'copy-btn copied';
+                    setTimeout(() => {
+                        copyBtn.textContent = '📋 Copy';
+                        copyBtn.className = 'copy-btn';
+                    }, 2500);
+                }
+            });
+
+            // ─── openBtn: prevent default if no URL ────────────────────
+
+            openBtn.addEventListener('click', function(e) {
+                if (!currentUrl) {
+                    e.preventDefault();
+                    showStatus('Nothing to open — get an M3U8 first.', 'error');
+                }
+            });
+
+            // ─── form submit ────────────────────────────────────────────
+
+            form.addEventListener('submit', handleSubmit);
+
+            // ─── auto-submit on paste? no, user clicks ────────────────
+
+            // ─── example placeholder ────────────────────────────────────
+
+            // ─── focus input on load ───────────────────────────────────
+
+            input.focus();
+
+            // ─── handle Enter key in input (already handled by form) ──
+
+            // ─── log any errors from fetch ─────────────────────────────
+
+            console.log('🔮 Twitch → M3U8 ready. Paste a channel URL and click Get M3U8.');
+
+            // ─── expose for debugging ──────────────────────────────────
+
+            window.__debug = {
+                extractChannel,
+                isValidChannel,
+                fetchM3u8,
+                CLIENT_ID
+            };
+
+        })();
+    </script>
+
+</body>
+  </html>
