@@ -1,4 +1,4 @@
-// Cloudflare Worker - Streaming Proxy with HLS support
+// Cloudflare Worker - Streaming Proxy with HLS and JavaScript URL rewriting
 // Usage: https://your-worker.workers.dev/https://example.com/video.m3u8
 
 addEventListener('fetch', event => {
@@ -8,15 +8,14 @@ addEventListener('fetch', event => {
 // Helper: rewrite URLs inside HTML and CSS
 class UrlRewriter {
   constructor(baseUrl, proxyBase) {
-    this.baseUrl = baseUrl;      // original page URL (absolute)
-    this.proxyBase = proxyBase;  // base URL of the proxy (e.g., https://worker.com)
+    this.baseUrl = baseUrl;
+    this.proxyBase = proxyBase;
   }
 
-  // Rewrite a single URL
   rewrite(url) {
     if (!url) return url;
     if (/^(javascript:|data:|mailto:|#|blob:|about:)/i.test(url)) return url;
-    if (url.startsWith(this.proxyBase)) return url; // already proxied
+    if (url.startsWith(this.proxyBase)) return url;
 
     let absolute;
     try {
@@ -27,7 +26,6 @@ class UrlRewriter {
     return `${this.proxyBase}/${absolute}`;
   }
 
-  // Rewrite srcset attribute
   rewriteSrcset(srcset) {
     if (!srcset) return srcset;
     return srcset.split(',').map(part => {
@@ -37,7 +35,6 @@ class UrlRewriter {
     }).join(', ');
   }
 
-  // Rewrite inline styles (url(...))
   rewriteStyle(style) {
     if (!style) return style;
     return style.replace(/url\((['"]?)(.*?)\1\)/gi, (match, quote, url) => {
@@ -66,7 +63,6 @@ function rewriteM3U8(content, baseUrl, proxyBase) {
   const rewritten = lines.map(line => {
     line = line.trim();
     if (!line || line.startsWith('#')) {
-      // Handle #EXT-X-KEY URI, #EXT-X-MEDIA URI, etc.
       if (line.startsWith('#EXT-X-KEY') || line.startsWith('#EXT-X-MEDIA') || line.startsWith('#EXT-X-MAP')) {
         return line.replace(/URI="([^"]*)"/i, (match, uri) => {
           const abs = new URL(uri, baseUrl).href;
@@ -75,11 +71,32 @@ function rewriteM3U8(content, baseUrl, proxyBase) {
       }
       return line;
     }
-    // Segment line – must be a URL
     const abs = new URL(line, baseUrl).href;
     return `${proxyBase}/${abs}`;
   });
   return rewritten.join('\n');
+}
+
+// Simplified JavaScript URL rewriting
+function rewriteJavaScript(jsText, baseUrl, proxyBase) {
+  // Match string literals (single, double, or backtick) that contain an absolute http(s) URL
+  // This will also match URLs inside template literals, but not those with embedded expressions.
+  const regex = /(['"`])(https?:\/\/[^\s'"`]+)\1/g;
+  return jsText.replace(regex, (match, quote, url) => {
+    // Skip if already proxied
+    if (url.startsWith(proxyBase)) return match;
+    // Skip non-http(s) URLs (shouldn't happen due to regex, but safety)
+    if (!/^https?:\/\//i.test(url)) return match;
+    // Skip data/blob URLs
+    if (/^(data:|blob:|javascript:)/i.test(url)) return match;
+
+    try {
+      const absolute = new URL(url, baseUrl).href;
+      return quote + proxyBase + '/' + absolute + quote;
+    } catch (e) {
+      return match;
+    }
+  });
 }
 
 // Main handler
@@ -87,15 +104,15 @@ async function handleRequest(request) {
   const url = new URL(request.url);
   const proxyBase = `${url.protocol}//${url.host}`;
 
-  // If request is to root, show a simple form
+  // Landing page
   if (url.pathname === '/' && request.method === 'GET') {
     return new Response(getLandingPage(), {
       headers: { 'Content-Type': 'text/html;charset=UTF-8' },
     });
   }
 
-  // Parse target URL from the path
-  let targetPath = url.pathname.slice(1); // remove leading slash
+  // Parse target URL from path
+  let targetPath = url.pathname.slice(1);
   if (!targetPath) {
     return new Response('Missing target URL. Usage: ' + proxyBase + '/https://example.com', { status: 400 });
   }
@@ -109,15 +126,14 @@ async function handleRequest(request) {
     return new Response('Invalid target URL: ' + e.message, { status: 400 });
   }
 
-  // Merge query parameters from the proxy URL to the target URL (except 'url' param)
+  // Forward query parameters (except 'url')
   url.searchParams.forEach((value, key) => {
     if (key !== 'url') targetUrl.searchParams.set(key, value);
   });
 
-  // Prepare request headers: forward most, but set Host to target
+  // Prepare request headers
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('Host', targetUrl.host);
-  // Remove proxy-specific headers
   requestHeaders.delete('cf-connecting-ip');
   requestHeaders.delete('cf-ray');
   requestHeaders.delete('x-forwarded-for');
@@ -133,9 +149,8 @@ async function handleRequest(request) {
   try {
     const response = await fetch(targetUrl.href, fetchOptions);
 
-    // Copy response headers
+    // Copy and clean response headers
     const responseHeaders = new Headers(response.headers);
-    // Remove problematic headers
     responseHeaders.delete('content-security-policy');
     responseHeaders.delete('content-security-policy-report-only');
     responseHeaders.delete('x-frame-options');
@@ -145,8 +160,8 @@ async function handleRequest(request) {
 
     const contentType = responseHeaders.get('content-type') || '';
 
+    // --- HTML ---
     if (contentType.includes('text/html')) {
-      // HTML: rewrite URLs
       const originalHtml = await response.text();
       const rewriter = new HTMLRewriter()
         .on('a[href]', new UrlRewriter(targetUrl.href, proxyBase))
@@ -164,11 +179,9 @@ async function handleRequest(request) {
         .on('embed[src]', new UrlRewriter(targetUrl.href, proxyBase))
         .on('[style]', new UrlRewriter(targetUrl.href, proxyBase));
 
-      // Create a Response object from the HTML string
       const originalResponse = new Response(originalHtml, {
         headers: { 'Content-Type': 'text/html; charset=utf-8' }
       });
-      // Transform and get the rewritten HTML
       const transformedResponse = rewriter.transform(originalResponse);
       const rewrittenHtml = await transformedResponse.text();
 
@@ -177,8 +190,29 @@ async function handleRequest(request) {
         statusText: response.statusText,
         headers: responseHeaders,
       });
-    } else if (contentType.includes('application/vnd.apple.mpegurl') || contentType.includes('application/x-mpegurl') || targetUrl.pathname.endsWith('.m3u8')) {
-      // HLS playlist: rewrite segment URLs
+    }
+
+    // --- JavaScript ---
+    else if (
+      contentType.includes('application/javascript') ||
+      contentType.includes('text/javascript') ||
+      contentType.includes('application/x-javascript')
+    ) {
+      const jsText = await response.text();
+      const rewrittenJS = rewriteJavaScript(jsText, targetUrl.href, proxyBase);
+      return new Response(rewrittenJS, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+      });
+    }
+
+    // --- HLS / M3U8 ---
+    else if (
+      contentType.includes('application/vnd.apple.mpegurl') ||
+      contentType.includes('application/x-mpegurl') ||
+      targetUrl.pathname.endsWith('.m3u8')
+    ) {
       const originalPlaylist = await response.text();
       const rewrittenPlaylist = rewriteM3U8(originalPlaylist, targetUrl.href, proxyBase);
       return new Response(rewrittenPlaylist, {
@@ -186,8 +220,10 @@ async function handleRequest(request) {
         statusText: response.statusText,
         headers: responseHeaders,
       });
-    } else {
-      // All other content: stream as-is
+    }
+
+    // --- Everything else: stream as-is ---
+    else {
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
@@ -238,4 +274,4 @@ function getLandingPage() {
   </script>
 </body>
 </html>`;
-      }
+  }
