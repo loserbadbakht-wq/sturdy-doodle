@@ -1,4 +1,4 @@
-// Cloudflare Worker: Twitch → m3u8 URL generator (AMOLED + responsive: PC horizontal, mobile stacked)
+// Cloudflare Worker: Twitch → m3u8 URL generator (AMOLED + responsive: PC horizontal 2-col grid, mobile stacked)
 
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 const GQL_URL = 'https://gql.twitch.tv/gql';
@@ -53,7 +53,7 @@ const html = `<!DOCTYPE html>
     }
     .container {
       width: 100%;
-      max-width: 800px;
+      max-width: 1000px;      /* wider for 2-column grid */
       background: var(--surface);
       border-radius: var(--radius);
       padding: 2rem;
@@ -126,8 +126,8 @@ const html = `<!DOCTYPE html>
     }
     #results {
       margin-top: 2rem;
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);  /* 2 columns on desktop */
       gap: 1rem;
     }
     .stream-item {
@@ -193,7 +193,7 @@ const html = `<!DOCTYPE html>
         margin-bottom: 1.5rem;
       }
       .input-row {
-        flex-direction: column;   /* stack vertically */
+        flex-direction: column;
       }
       .input-row input[type="text"] {
         width: 100%;
@@ -202,7 +202,7 @@ const html = `<!DOCTYPE html>
         width: 100%;
       }
       .url-row {
-        flex-direction: column;   /* stack URL and copy button */
+        flex-direction: column;
         align-items: stretch;
       }
       .url-row input[type="text"] {
@@ -220,6 +220,9 @@ const html = `<!DOCTYPE html>
       footer {
         font-size: 0.75rem;
       }
+      #results {
+        grid-template-columns: 1fr;  /* single column on mobile */
+      }
     }
 
     /* ===== PC (desktop) horizontal layout ===== */
@@ -229,10 +232,6 @@ const html = `<!DOCTYPE html>
       }
       .url-row {
         flex-direction: row;      /* horizontal */
-      }
-      /* Optional: slightly larger max-width for better spacing */
-      .container {
-        max-width: 800px;
       }
     }
   </style>
