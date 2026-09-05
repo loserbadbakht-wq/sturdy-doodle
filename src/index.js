@@ -230,6 +230,8 @@ function getHomePage(proxyBase) {
       box-shadow: 0 10px 30px rgba(0,0,0,0.8);
     }
     .input-group {
+      padding: 8px 12px;
+      background: #222;
       display: flex;
       gap: 8px;
       align-items: center;
