@@ -232,7 +232,6 @@ function getHomePage(proxyBase) {
     .input-group {
       background: #222;
       display: flex;
-      gap: 8px;
       align-items: center;
       
     }
