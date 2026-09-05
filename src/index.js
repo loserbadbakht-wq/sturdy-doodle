@@ -310,7 +310,6 @@ function getHomePage(proxyBase) {
         </div>
       </div>
     </div>
-  </div>
 
   <!-- Video.js JavaScript -->
   <script src="//vjs.zencdn.net/8.23.6/video.min.js"></script>
