@@ -329,8 +329,8 @@ function getHomePage(proxyBase) {
         skipButtons: {
           forward: 10
           backward: 10
-    }
-  }
+        }
+      }
     });
 
     // Load custom video URL through the proxy
