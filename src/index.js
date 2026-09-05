@@ -230,9 +230,10 @@ function getHomePage(proxyBase) {
       box-shadow: 0 10px 30px rgba(0,0,0,0.8);
     }
     .input-group {
-      background: #222;
       display: flex;
+      gap: 8px;
       align-items: center;
+      border-top: 1px solid #333;
       
     }
     input[type="text"] {
