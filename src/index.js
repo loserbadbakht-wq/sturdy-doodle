@@ -280,11 +280,6 @@ function getHomePage(proxyBase) {
       margin-top: 1rem;
       text-align: left;
     }
-    .source-input label {
-      font-weight: bold;
-      display: block;
-      margin-bottom: 0.5rem;
-    }
   </style>
 </head>
 <body>
