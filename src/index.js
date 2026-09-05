@@ -68,6 +68,7 @@ const html = `<!DOCTYPE html>
       margin-bottom: 0.5rem;
       font-size: 1.8rem;
       letter-spacing: -0.5px;
+      color: var(--accent);   /* title uses accent color unless rainbow class overrides */
     }
     /* Animated rainbow gradient for the default title */
     .rainbow-text {
@@ -75,8 +76,8 @@ const html = `<!DOCTYPE html>
       background-size: 400% 100%;
       -webkit-background-clip: text;
       background-clip: text;
-      color: transparent;
-      animation: rainbow-animation 5s linear infinite;
+      color: transparent;   /* overrides the accent color */
+      animation: rainbow-animation 12s linear infinite;  /* <-- slower: 12s */
     }
     @keyframes rainbow-animation {
       0% { background-position: 0% 50%; }
