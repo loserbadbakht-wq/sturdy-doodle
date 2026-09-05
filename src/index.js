@@ -211,48 +211,63 @@ function getHomePage(proxyBase) {
   <link href="//vjs.zencdn.net/8.23.6/video-js.min.css" rel="stylesheet">
   <style>
     body {
-      font-family: system-ui, sans-serif;
+      background-color: #141414;
+      color: #666;
       display: flex;
       justify-content: center;
       align-items: center;
+      text-align: center;
       min-height: 100vh;
-      margin: 0;
-      background: #f0f0f0;
+      font-family: sans-serif;
       padding: 20px;
     }
     .container {
-      background: white;
-      padding: 2rem;
-      border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      text-align: center;
-      max-width: 700px;
-      width: 90%;
+      width: 100%;
+      max-width: 800px;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
     }
     h1 {
       margin-bottom: 1rem;
     }
     .input-group {
+      padding: 8px 12px;
+      background: #222;
       display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
+      gap: 8px;
+      align-items: center;
+      border-top: 1px solid #333;
+      
     }
     input[type="text"] {
       flex: 1;
-      padding: 0.75rem;
-      font-size: 1rem;
-      border: 1px solid #ccc;
+      padding: 6px 10px;
+      border: 1px solid #444;
       border-radius: 4px;
+      background: #111;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+      transition: border 0.2s;
+    }
+    input[type="text"]:focus {
+        border-color: #0070f3;
+    }
+    input[type="text"]:hover {
+        border-color: #0070f3;
     }
     button {
-      padding: 0.75rem 1.5rem;
-      font-size: 1rem;
       background: #0070f3;
-      color: white;
-      border: none;
+      color: #fff;
+      padding: 6px 14px;
       border-radius: 4px;
+      font-weight: bold;
+      border: none;
       cursor: pointer;
-      white-space: nowrap;
+      font-size: 13px;
+      transition: background 0.2s;
     }
     button:hover {
       background: #0051a8;
@@ -285,9 +300,7 @@ function getHomePage(proxyBase) {
 </head>
 <body>
   <div class="container">
-    <h1>Media Proxy Player</h1>
-    <p>Enter a direct video URL (e.g., <code>.m3u8</code> or <code>.mp4</code>). It will be proxied through this worker.</p>
-
+   
     <!-- Video.js player -->
     <div class="video-container">
       <video
@@ -312,16 +325,11 @@ function getHomePage(proxyBase) {
 
       <!-- Custom source input -->
       <div class="source-input">
-        <label for="videoUrlInput">Load custom video URL (MP4, WebM, OGG, HLS (.m3u8), DASH) — will be proxied:</label>
         <div class="input-group">
-          <input type="text" id="videoUrlInput" placeholder="https://example.com/path/to/stream.m3u8">
+          <input type="text" id="videoUrlInput" placeholder="Enter Video URL to Proxy">
           <button type="button" id="loadVideoBtn">Load Video</button>
         </div>
       </div>
-    </div>
-
-    <p class="note">Direct proxied URL format: <code>${proxyBase}/https://example.com/path</code></p>
-  </div>
 
   <!-- Video.js JavaScript -->
   <script src="//vjs.zencdn.net/8.23.6/video.min.js"></script>
