@@ -320,6 +320,12 @@ function getHomePage(proxyBase) {
       controls: true,
       preload: 'auto',
       poster: 'https://gamefa.com/wp-content/uploads/2024/02/Star-Wars-Outlaws.jpg'
+      controlBar: {
+        skipButtons: {
+          forward: 10
+          backward: 10
+        }
+      }
     });
 
     // Load custom video URL through the proxy
