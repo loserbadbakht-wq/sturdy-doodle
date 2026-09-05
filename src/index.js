@@ -270,9 +270,6 @@ function getHomePage(proxyBase) {
       background: #0051a8;
     }
     .video-container {
-      margin-top: 2rem;
-      border-top: 1px solid #ddd;
-      padding-top: 1.5rem;
       height: 100%;
       width: 100%;
     }
