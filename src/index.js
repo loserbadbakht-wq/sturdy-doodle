@@ -285,10 +285,7 @@ function getHomePage(proxyBase) {
       <video
         id="my-player"
         class="video-js vjs-big-play-centered"
-        controls
-        preload="auto"
-        poster="//vjs.zencdn.net/v/oceans.png"
-      >
+        >
         <source src="//vjs.zencdn.net/v/oceans.mp4" type="video/mp4"></source>
         <source src="//vjs.zencdn.net/v/oceans.webm" type="video/webm"></source>
         <source src="//vjs.zencdn.net/v/oceans.ogv" type="video/ogg"></source>
