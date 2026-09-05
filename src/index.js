@@ -390,13 +390,13 @@ function getErrorPage(error, targetUrl) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Proxy Error</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
-    .error-container { background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
-    .direct-access { background-color: #d4edda; color: #155724; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+    body { background-color: #000000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: #ffffff; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .error-container { background-color: #721c24; color: #f8d7da; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+    .direct-access { background-color: #155724; color: #d4edda; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
     h1 { color: #d63031; }
-    a.direct-link { display: inline-block; margin-top: 10px; color: #fff; background-color: #17a2b8; padding: 8px 16px; text-decoration: none; border-radius: 4px; }
-    a.direct-link:hover { background-color: #138496; }
-    .details { background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin-top: 20px; font-family: monospace; white-space: pre-wrap; }
+    a.direct-link { display: inline-block; margin-top: 10px; color: #fff; background-color: #138496; padding: 8px 16px; text-decoration: none; border-radius: 4px; }
+    a.direct-link:hover { background-color: #17a2b8; }
+    .details { background-color: #121212; padding: 15px; border-radius: 4px; margin-top: 20px; font-family: monospace; white-space: pre-wrap; }
   </style>
 </head>
 <body>
