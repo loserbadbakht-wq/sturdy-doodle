@@ -1,5 +1,5 @@
-// Cloudflare Worker - Streaming Proxy with Advanced Features
-// Usage: https://your-worker.workers.dev/https://example.com/video.m3u8
+// Cloudflare Worker - Streaming Proxy with Advanced Features (No Video Player)
+// Usage: https://your-worker.workers.dev/https://example.com
 
 addEventListener('fetch', event => {
   event.respondWith(handleRequest(event.request));
@@ -392,14 +392,10 @@ async function handleRequest(request) {
   const isWikipediaSite = config.specialSites.wikipedia.enabled &&
     config.specialSites.wikipedia.domains.some(d => targetUrl.hostname.endsWith(d));
 
-  // Build request headers with browser emulation
   const requestHeaders = new Headers();
-  // Copy essential original headers
   ['cookie', 'range', 'if-none-match', 'if-modified-since', 'content-type', 'content-length'].forEach(h => {
     if (request.headers.has(h)) requestHeaders.set(h, request.headers.get(h));
   });
-
-  // Browser emulation
   requestHeaders.set('User-Agent', config.browserEmulation.userAgent);
   requestHeaders.set('Accept', config.browserEmulation.accept);
   requestHeaders.set('Accept-Language', config.browserEmulation.acceptLanguage);
@@ -419,7 +415,6 @@ async function handleRequest(request) {
   if (originalReferer) {
     const refererUrl = new URL(originalReferer);
     if (refererUrl.host === url.host) {
-      // It's a proxied referer; extract the actual target URL
       let inner = refererUrl.pathname.slice(1);
       if (inner.startsWith('http://') || inner.startsWith('https://')) {
         requestHeaders.set('Referer', inner);
@@ -427,11 +422,8 @@ async function handleRequest(request) {
         requestHeaders.set('Referer', targetUrl.origin);
       }
     } else {
-      // Direct referer from elsewhere, forward as-is
       requestHeaders.set('Referer', originalReferer);
     }
-  } else {
-    // No referer; omit (do not set)
   }
 
   if (originalOrigin) {
@@ -442,7 +434,6 @@ async function handleRequest(request) {
       requestHeaders.set('Origin', originalOrigin);
     }
   } else {
-    // No origin; omit. For direct m3u8, many servers reject an Origin header, so we ensure it's not set.
     if (targetUrl.pathname.endsWith('.m3u8')) {
       requestHeaders.delete('Origin');
     }
@@ -569,7 +560,7 @@ async function handleRequest(request) {
 }
 
 // ============================
-// Landing Page (with Video.js and HLS support, and proxied custom sources)
+// Landing Page (URL bar only, no video player)
 // ============================
 function getHomePage(proxyBase) {
   return new Response(`<!DOCTYPE html>
@@ -578,8 +569,6 @@ function getHomePage(proxyBase) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Streaming Proxy</title>
-  <!-- Video.js CSS -->
-  <link href="//vjs.zencdn.net/8.23.6/video-js.min.css" rel="stylesheet">
   <style>
     body {
       font-family: system-ui, sans-serif;
@@ -597,7 +586,7 @@ function getHomePage(proxyBase) {
       border-radius: 8px;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
       text-align: center;
-      max-width: 700px;
+      max-width: 500px;
       width: 90%;
     }
     h1 {
@@ -638,73 +627,21 @@ function getHomePage(proxyBase) {
       padding: 0.2rem 0.4rem;
       border-radius: 3px;
     }
-    .video-container {
-      margin-top: 2rem;
-      border-top: 1px solid #ddd;
-      padding-top: 1.5rem;
-    }
-    .source-input {
-      margin-top: 1rem;
-      text-align: left;
-    }
-    .source-input label {
-      font-weight: bold;
-      display: block;
-      margin-bottom: 0.5rem;
-    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Streaming Proxy</h1>
-    <p>Enter a direct video URL (e.g., <code>.m3u8</code> or <code>.mp4</code>) or a simple website.</p>
+    <p>Enter a website URL to browse through the proxy.</p>
     <form id="proxyForm">
       <div class="input-group">
-        <input type="text" id="urlInput" placeholder="https://example.com/stream.m3u8" required>
+        <input type="text" id="urlInput" placeholder="https://example.com" required>
         <button type="submit">Go</button>
       </div>
     </form>
-
-    <!-- Video.js demo player -->
-    <div class="video-container">
-      <video
-        id="my-player"
-        class="video-js vjs-big-play-centered"
-        controls
-        preload="auto"
-        poster="//vjs.zencdn.net/v/oceans.png"
-        data-setup='{"fluid": true, "responsive": true, "playbackRates": [0.5, 1, 1.5, 2]}'
-      >
-        <source src="//vjs.zencdn.net/v/oceans.mp4" type="video/mp4"></source>
-        <source src="//vjs.zencdn.net/v/oceans.webm" type="video/webm"></source>
-        <source src="//vjs.zencdn.net/v/oceans.ogv" type="video/ogg"></source>
-        <p class="vjs-no-js">
-          To view this video please enable JavaScript, and consider upgrading to a
-          web browser that
-          <a href="https://videojs.com/html5-video-support/" target="_blank">
-            supports HTML5 video
-          </a>
-        </p>
-      </video>
-
-      <!-- Custom source input -->
-      <div class="source-input">
-        <label for="videoUrlInput">Load custom video URL (MP4, WebM, OGG, HLS (.m3u8), DASH) — will be proxied:</label>
-        <div class="input-group">
-          <input type="text" id="videoUrlInput" placeholder="https://example.com/path/to/stream.m3u8">
-          <button type="button" id="loadVideoBtn">Load Video</button>
-        </div>
-      </div>
-    </div>
-
     <p class="note">Usage: <code>${proxyBase}/https://example.com/path</code><br>
     Complex sites (YouTube, Twitch) will NOT work due to JavaScript and WebSocket limitations.</p>
   </div>
-
-  <!-- Video.js JavaScript -->
-  <script src="//vjs.zencdn.net/8.23.6/video.min.js"></script>
-  <!-- VHS (HTTP Streaming) plugin for HLS and DASH -->
-  <script src="//cdn.jsdelivr.net/npm/@videojs/http-streaming@3.13.0/dist/videojs-http-streaming.min.js"></script>
   <script>
     document.getElementById('proxyForm').addEventListener('submit', function(e) {
       e.preventDefault();
@@ -713,51 +650,6 @@ function getHomePage(proxyBase) {
       if (!/^https?:\\/\\//i.test(input)) input = 'https://' + input;
       window.location.href = '/' + input;
     });
-
-    // Initialize Video.js player
-    var player = videojs('my-player', {
-      fluid: true,
-      responsive: true,
-      playbackRates: [0.5, 1, 1.5, 2],
-      controls: true,
-      preload: 'auto',
-      poster: '//vjs.zencdn.net/v/oceans.png'
-    });
-
-    // Load custom video URL through the proxy
-    document.getElementById('loadVideoBtn').addEventListener('click', function() {
-      var url = document.getElementById('videoUrlInput').value.trim();
-      if (!url) {
-        alert('Please enter a video URL');
-        return;
-      }
-      // Ensure the URL has a protocol
-      if (!/^https?:\\/\\//i.test(url)) {
-        if (url.startsWith('//')) url = 'https:' + url;
-        else if (!url.includes('://')) url = 'https://' + url;
-      }
-
-      // Build the proxied URL: current origin + '/' + original absolute URL
-      var proxiedUrl = window.location.origin + '/' + url;
-
-      // Determine MIME type from original URL
-      var type = getTypeFromUrl(url);
-
-      // Set source to the proxied URL and play
-      player.src({ src: proxiedUrl, type: type });
-      player.play();
-    });
-
-    // Helper to guess MIME type from URL
-    function getTypeFromUrl(url) {
-      const lower = url.toLowerCase();
-      if (lower.includes('.m3u8')) return 'application/x-mpegURL';
-      if (lower.includes('.mpd')) return 'application/dash+xml';
-      if (lower.includes('.mp4')) return 'video/mp4';
-      if (lower.includes('.webm')) return 'video/webm';
-      if (lower.includes('.ogv') || lower.includes('.ogg')) return 'video/ogg';
-      return undefined;
-    }
   </script>
 </body>
 </html>`, {
