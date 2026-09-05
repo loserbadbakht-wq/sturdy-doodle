@@ -288,7 +288,6 @@ function getHomePage(proxyBase) {
         controls
         preload="auto"
         poster="//vjs.zencdn.net/v/oceans.png"
-        data-setup='{"fluid": true, "responsive": true, "playbackRates": [0.5, 1, 1.5, 2]}'
       >
         <source src="//vjs.zencdn.net/v/oceans.mp4" type="video/mp4"></source>
         <source src="//vjs.zencdn.net/v/oceans.webm" type="video/webm"></source>
