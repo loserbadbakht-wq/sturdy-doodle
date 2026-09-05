@@ -324,12 +324,6 @@ function getHomePage(proxyBase) {
       controls: true,
       preload: 'auto',
       poster: '//vjs.zencdn.net/v/oceans.png'
-      controlBar: {
-        skipButtons: {
-          forward: 10
-          backward: 10
-        }
-      }
     });
 
     // Load custom video URL through the proxy
