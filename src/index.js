@@ -229,9 +229,6 @@ function getHomePage(proxyBase) {
       overflow: hidden;
       box-shadow: 0 10px 30px rgba(0,0,0,0.8);
     }
-    h1 {
-      margin-bottom: 1rem;
-    }
     .input-group {
       padding: 8px 12px;
       background: #222;
@@ -272,21 +269,12 @@ function getHomePage(proxyBase) {
     button:hover {
       background: #0051a8;
     }
-    .note {
-      font-size: 0.85rem;
-      color: #666;
-      margin-top: 1rem;
-    }
-    code {
-      background: #eee;
-      padding: 0.2rem 0.4rem;
-      border-radius: 3px;
-    }
     .video-container {
       margin-top: 2rem;
       border-top: 1px solid #ddd;
       padding-top: 1.5rem;
       height: 100%;
+      width: 100%;
     }
     .source-input {
       margin-top: 1rem;
