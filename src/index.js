@@ -272,7 +272,6 @@ function getHomePage(proxyBase) {
       width: 100%;
     }
     .source-input {
-      margin-top: 1rem;
       text-align: left;
     }
   </style>
