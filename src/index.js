@@ -1,9 +1,12 @@
-// Cloudflare Worker: Twitch → m3u8 URL generator (AMOLED + responsive: PC horizontal 2-col grid, mobile stacked)
+// Cloudflare Worker: Streaming Platform → m3u8 (Twitch + YouTube)
 
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 const GQL_URL = 'https://gql.twitch.tv/gql';
 const USHER_BASE = 'https://usher.ttvnw.net/api/v2/channel/hls/';
-const PLAYBACK_ACCESS_TOKEN_QUERY = {
+const YT_API_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+
+// Twitch persisted query for access token
+const TWITCH_ACCESS_TOKEN_QUERY = {
   operationName: 'PlaybackAccessToken',
   extensions: {
     persistedQuery: {
@@ -21,12 +24,13 @@ const PLAYBACK_ACCESS_TOKEN_QUERY = {
   }
 };
 
+// ---------- HTML Page ----------
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Twitch → m3u8</title>
+  <title>Streaming Platform → m3u8</title>
   <style>
     :root {
       --bg: #000000;
@@ -34,7 +38,7 @@ const html = `<!DOCTYPE html>
       --surface-hover: #1e1e1e;
       --text: #ffffff;
       --text-secondary: #b3b3b3;
-      --accent: #9146ff;
+      --accent: #9146ff;        /* Twitch purple default */
       --accent-hover: #772ce8;
       --border: #2a2a2a;
       --radius: 8px;
@@ -53,22 +57,36 @@ const html = `<!DOCTYPE html>
     }
     .container {
       width: 100%;
-      max-width: 1000px;      /* wider for 2-column grid */
+      max-width: 1000px;
       background: var(--surface);
       border-radius: var(--radius);
       padding: 2rem;
       box-shadow: 0 4px 20px rgba(0,0,0,0.6);
     }
     h1 {
-      color: var(--accent);
+      text-align: center;
       margin-bottom: 0.5rem;
       font-size: 1.8rem;
       letter-spacing: -0.5px;
+    }
+    /* Animated rainbow gradient for the default title */
+    .rainbow-text {
+      background: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet);
+      background-size: 400% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: rainbow-animation 5s linear infinite;
+    }
+    @keyframes rainbow-animation {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 400% 50%; }
     }
     .subtitle {
       color: var(--text-secondary);
       margin-bottom: 2rem;
       font-size: 0.95rem;
+      text-align: center;
     }
     label {
       display: block;
@@ -118,16 +136,18 @@ const html = `<!DOCTYPE html>
       margin: 1rem 0;
       color: var(--text-secondary);
       font-style: italic;
+      text-align: center;
     }
     #error {
       color: #ff4444;
       margin-top: 1rem;
       font-size: 0.9rem;
+      text-align: center;
     }
     #results {
       margin-top: 2rem;
       display: grid;
-      grid-template-columns: repeat(2, 1fr);  /* 2 columns on desktop */
+      grid-template-columns: repeat(2, 1fr);
       gap: 1rem;
     }
     .stream-item {
@@ -137,7 +157,7 @@ const html = `<!DOCTYPE html>
       padding: 1rem;
       transition: border-color var(--transition);
     }
-    .stream-item:hover { border-color: var(--accent); } /* purple hover border */
+    .stream-item:hover { border-color: var(--accent); }
     .stream-item label {
       margin-bottom: 0.5rem;
       font-size: 0.85rem;
@@ -175,7 +195,6 @@ const html = `<!DOCTYPE html>
       font-size: 0.8rem;
     }
 
-    /* ===== Mobile (stacked) layout ===== */
     @media (max-width: 600px) {
       body {
         padding: 0.5rem;
@@ -185,75 +204,67 @@ const html = `<!DOCTYPE html>
         padding: 1.2rem;
         border-radius: 6px;
       }
-      h1 {
-        font-size: 1.5rem;
-      }
-      .subtitle {
-        font-size: 0.85rem;
-        margin-bottom: 1.5rem;
-      }
-      .input-row {
-        flex-direction: column;
-      }
-      .input-row input[type="text"] {
-        width: 100%;
-      }
-      .input-row button {
-        width: 100%;
-      }
-      .url-row {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      .url-row input[type="text"] {
-        width: 100%;
-      }
-      .url-row .copy-btn {
-        width: 100%;
-      }
-      .stream-item {
-        padding: 0.8rem;
-      }
-      label {
-        font-size: 0.8rem;
-      }
-      footer {
-        font-size: 0.75rem;
-      }
-      #results {
-        grid-template-columns: 1fr;  /* single column on mobile */
-      }
+      h1 { font-size: 1.5rem; }
+      .subtitle { font-size: 0.85rem; margin-bottom: 1.5rem; }
+      .input-row { flex-direction: column; }
+      .input-row input[type="text"] { width: 100%; }
+      .input-row button { width: 100%; }
+      .url-row { flex-direction: column; align-items: stretch; }
+      .url-row input[type="text"] { width: 100%; }
+      .url-row .copy-btn { width: 100%; }
+      .stream-item { padding: 0.8rem; }
+      label { font-size: 0.8rem; }
+      footer { font-size: 0.75rem; }
+      #results { grid-template-columns: 1fr; }
     }
 
-    /* ===== PC (desktop) horizontal layout ===== */
     @media (min-width: 601px) {
-      .input-row {
-        flex-direction: row;      /* horizontal */
-      }
-      .url-row {
-        flex-direction: row;      /* horizontal */
-      }
+      .input-row { flex-direction: row; }
+      .url-row { flex-direction: row; }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Twitch → m3u8</h1>
-    <p class="subtitle">Get direct HLS stream URLs for any live channel</p>
+    <h1 id="mainTitle" class="rainbow-text">Streaming Platform → m3u8</h1>
+    <p class="subtitle">Enter a Twitch channel name or YouTube live URL</p>
     <div class="input-row">
-      <input type="text" id="channel" placeholder="e.g. twitch, shroud, xqcow..." />
+      <input type="text" id="inputUrl" placeholder="e.g. twitch, shroud, or https://youtube.com/watch?v=..." />
       <button onclick="getStreams()">Get Streams</button>
     </div>
     <div id="loading">Loading…</div>
     <div id="results"></div>
     <div id="error"></div>
-    <footer>Works best with live channels • AMOLED friendly</footer>
+    <footer>Works with live channels • AMOLED friendly</footer>
   </div>
 
   <script>
+    // Change the accent color and title based on platform
+    function setPlatform(platform) {
+      const root = document.documentElement;
+      const title = document.getElementById('mainTitle');
+      if (platform === 'twitch') {
+        root.style.setProperty('--accent', '#9146ff');
+        root.style.setProperty('--accent-hover', '#772ce8');
+        title.textContent = 'Twitch → m3u8';
+        title.classList.remove('rainbow-text');
+      } else if (platform === 'youtube') {
+        root.style.setProperty('--accent', '#ff0000');
+        root.style.setProperty('--accent-hover', '#cc0000');
+        title.textContent = 'YouTube → m3u8';
+        title.classList.remove('rainbow-text');
+      } else {
+        // Reset to default rainbow
+        root.style.setProperty('--accent', '#9146ff');
+        root.style.setProperty('--accent-hover', '#772ce8');
+        title.textContent = 'Streaming Platform → m3u8';
+        title.classList.add('rainbow-text');
+      }
+    }
+
     async function getStreams() {
-      const channel = document.getElementById('channel').value.trim();
-      if (!channel) return;
+      const input = document.getElementById('inputUrl').value.trim();
+      if (!input) return;
 
       const loading = document.getElementById('loading');
       const results = document.getElementById('results');
@@ -262,8 +273,12 @@ const html = `<!DOCTYPE html>
       results.innerHTML = '';
       error.textContent = '';
 
+      // Detect platform: if it's a YouTube URL, treat as YouTube, otherwise Twitch channel
+      const isYouTube = /youtube\.com|youtu\.be/i.test(input);
+      setPlatform(isYouTube ? 'youtube' : 'twitch');
+
       try {
-        const response = await fetch('/getstreams?channel=' + encodeURIComponent(channel));
+        const response = await fetch('/getstreams?url=' + encodeURIComponent(input));
         const data = await response.json();
 
         if (!response.ok) {
@@ -326,13 +341,15 @@ const html = `<!DOCTYPE html>
 </body>
 </html>`;
 
+// ---------- Helper Functions ----------
+
 /**
- * Fetch the playback access token for a live channel.
+ * Fetch Twitch access token for a live channel.
  */
-async function getAccessToken(channel) {
+async function getTwitchAccessToken(channel) {
   const query = {
-    ...PLAYBACK_ACCESS_TOKEN_QUERY,
-    variables: { ...PLAYBACK_ACCESS_TOKEN_QUERY.variables, login: channel }
+    ...TWITCH_ACCESS_TOKEN_QUERY,
+    variables: { ...TWITCH_ACCESS_TOKEN_QUERY.variables, login: channel }
   };
 
   const resp = await fetch(GQL_URL, {
@@ -345,28 +362,28 @@ async function getAccessToken(channel) {
   });
 
   if (!resp.ok) {
-    throw new Error(`GQL API returned ${resp.status}`);
+    throw new Error(`Twitch GQL API returned ${resp.status}`);
   }
 
   const json = await resp.json();
   if (json.errors && json.errors.length > 0) {
-    throw new Error(json.errors[0].message || 'GQL error');
+    throw new Error(json.errors[0].message || 'Twitch GQL error');
   }
   if (!json.data?.streamPlaybackAccessToken) {
-    throw new Error('No access token received. Channel may be offline or invalid.');
+    throw new Error('No access token received. Twitch channel may be offline or invalid.');
   }
 
   const { signature, value } = json.data.streamPlaybackAccessToken;
   if (!signature || !value) {
-    throw new Error('Invalid access token format');
+    throw new Error('Invalid Twitch access token format');
   }
   return { signature, value };
 }
 
 /**
- * Build the usher master playlist URL and fetch it.
+ * Build and fetch Twitch master playlist URL.
  */
-async function getMasterM3U8(channel, token, signature) {
+async function getTwitchMasterM3U8(channel, token, signature) {
   const params = new URLSearchParams({
     platform: 'web',
     p: String(Math.floor(Math.random() * 1000000)),
@@ -391,13 +408,13 @@ async function getMasterM3U8(channel, token, signature) {
   });
 
   if (!resp.ok) {
-    throw new Error(`Usher returned ${resp.status}. The channel may be offline or the token expired.`);
+    throw new Error(`Twitch Usher returned ${resp.status}. Channel may be offline or token expired.`);
   }
   return { text: await resp.text(), url: masterUrl };
 }
 
 /**
- * Parse the master m3u8 and extract variant streams.
+ * Parse a master m3u8 playlist and extract variant streams.
  */
 function parseMasterPlaylist(masterText, masterUrl) {
   const lines = masterText.split('\n');
@@ -427,6 +444,8 @@ function parseMasterPlaylist(masterText, masterUrl) {
           if (currentStreamInfo['FRAME-RATE']) {
             quality += ` ${currentStreamInfo['FRAME-RATE']}fps`;
           }
+        } else if (currentStreamInfo['NAME']) {
+          quality = currentStreamInfo['NAME'];
         }
         if (quality.startsWith('audio')) {
           quality = 'audio_only';
@@ -441,17 +460,151 @@ function parseMasterPlaylist(masterText, masterUrl) {
 }
 
 /**
- * Main function: orchestrates token fetch, master playlist fetch, and parsing.
+ * Twitch stream fetching orchestration.
  */
-async function getStreams(channel) {
-  const { signature, value } = await getAccessToken(channel);
-  const { text, url } = await getMasterM3U8(channel, value, signature);
+async function getTwitchStreams(channel) {
+  const { signature, value } = await getTwitchAccessToken(channel);
+  const { text, url } = await getTwitchMasterM3U8(channel, value, signature);
   return parseMasterPlaylist(text, url);
 }
 
+// ---------- YouTube Functions ----------
+
 /**
- * Cloudflare Worker request handler.
+ * Extract YouTube video ID from various URL forms, or by fetching the page.
  */
+async function extractYouTubeVideoId(url) {
+  // Direct video ID patterns
+  const patterns = [
+    /youtube\.com\/watch\?.*v=([\w-]{11})/,
+    /youtu\.be\/([\w-]{11})/,
+    /youtube\.com\/embed\/([\w-]{11})/,
+    /youtube\.com\/live\/([\w-]{11})/,
+    /youtube\.com\/v\/([\w-]{11})/
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+
+  // If not found, try to fetch the page and extract from ytInitialData
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    if (!resp.ok) return null;
+    const text = await resp.text();
+
+    // Look for ytInitialData
+    const dataRegex = /var\s+ytInitialData\s*=\s*({.*?});\s*<\/script>/s;
+    const match = text.match(dataRegex);
+    if (match) {
+      const data = JSON.parse(match[1]);
+      // Recursively search for videoId
+      const videoId = findVideoId(data);
+      if (videoId) return videoId;
+    }
+
+    // Try ytInitialPlayerResponse
+    const playerRegex = /var\s+ytInitialPlayerResponse\s*=\s*({.*?});\s*var\s+\w+\s*=/s;
+    const playerMatch = text.match(playerRegex);
+    if (playerMatch) {
+      const playerData = JSON.parse(playerMatch[1]);
+      if (playerData.videoDetails && playerData.videoDetails.videoId) {
+        return playerData.videoDetails.videoId;
+      }
+    }
+  } catch (e) {
+    // ignore and return null
+  }
+  return null;
+}
+
+// Helper to search for videoId in nested objects
+function findVideoId(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  if (obj.videoId && typeof obj.videoId === 'string') return obj.videoId;
+  for (const key in obj) {
+    const result = findVideoId(obj[key]);
+    if (result) return result;
+  }
+  return null;
+}
+
+/**
+ * Fetch YouTube player response via innertube API.
+ */
+async function fetchYouTubePlayerResponse(videoId) {
+  const resp = await fetch('https://www.youtube.com/youtubei/v1/player', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    params: new URLSearchParams({ key: YT_API_KEY }),
+    body: JSON.stringify({
+      videoId: videoId,
+      contentCheckOk: true,
+      racyCheckOk: true,
+      context: {
+        client: {
+          clientName: 'ANDROID',
+          clientVersion: '21.08.266',
+          platform: 'DESKTOP',
+          clientScreen: 'EMBED',
+          clientFormFactor: 'UNKNOWN_FORM_FACTOR',
+          browserName: 'Chrome',
+        },
+        user: { lockedSafetyMode: 'false' },
+        request: { useSsl: 'true' },
+      },
+    }),
+  });
+
+  if (!resp.ok) {
+    throw new Error(`YouTube API returned ${resp.status}`);
+  }
+  return await resp.json();
+}
+
+/**
+ * YouTube stream fetching.
+ */
+async function getYouTubeStreams(url) {
+  const videoId = await extractYouTubeVideoId(url);
+  if (!videoId) {
+    throw new Error('Could not find YouTube video ID. Make sure the URL is correct and the video is live.');
+  }
+
+  const playerResponse = await fetchYouTubePlayerResponse(videoId);
+
+  // Check playability status
+  const status = playerResponse?.playabilityStatus?.status;
+  const reason = playerResponse?.playabilityStatus?.reason;
+  if (status && status !== 'OK') {
+    throw new Error(`YouTube error: ${status}${reason ? ' - ' + reason : ''}`);
+  }
+
+  const hlsManifestUrl = playerResponse?.streamingData?.hlsManifestUrl;
+  if (!hlsManifestUrl) {
+    throw new Error('No HLS manifest found. The video might not be live or is protected.');
+  }
+
+  const resp = await fetch(hlsManifestUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
+    }
+  });
+  if (!resp.ok) {
+    throw new Error(`Failed to fetch YouTube HLS manifest (${resp.status})`);
+  }
+  const masterText = await resp.text();
+  return parseMasterPlaylist(masterText, hlsManifestUrl);
+}
+
+// ---------- Main Request Handler ----------
+
 async function handleRequest(request) {
   const url = new URL(request.url);
 
@@ -462,16 +615,22 @@ async function handleRequest(request) {
   }
 
   if (url.pathname === '/getstreams') {
-    const channel = url.searchParams.get('channel');
-    if (!channel) {
-      return new Response(JSON.stringify({ error: 'Missing channel parameter' }), {
+    const inputUrl = url.searchParams.get('url');
+    if (!inputUrl) {
+      return new Response(JSON.stringify({ error: 'Missing url parameter' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
     try {
-      const streams = await getStreams(channel);
+      let streams;
+      if (/youtube\.com|youtu\.be/i.test(inputUrl)) {
+        streams = await getYouTubeStreams(inputUrl);
+      } else {
+        // Assume Twitch channel name
+        streams = await getTwitchStreams(inputUrl.trim());
+      }
       return new Response(JSON.stringify({ streams }), {
         headers: { 'Content-Type': 'application/json' }
       });
