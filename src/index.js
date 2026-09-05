@@ -235,7 +235,6 @@ function getHomePage(proxyBase) {
       display: flex;
       gap: 8px;
       align-items: center;
-      border-top: 1px solid #333;
       
     }
     input[type="text"] {
