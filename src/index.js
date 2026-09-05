@@ -319,7 +319,7 @@ function getHomePage(proxyBase) {
       playbackRates: [0.5, 1, 1.5, 2],
       controls: true,
       preload: 'auto',
-      poster: '//vjs.zencdn.net/v/oceans.png'
+      poster: 'https://gamefa.com/wp-content/uploads/2024/02/Star-Wars-Outlaws.jpg'
     });
 
     // Load custom video URL through the proxy
