@@ -283,7 +283,7 @@ function getHomePage(proxyBase) {
     <div class="video-container">
       <video
         id="my-player"
-        class="video-js vjs-big-play-centered"
+        class="video-js vjs-big-play-centered vjs-playback-rate"
         width="100%"
         height="100%"
         >
