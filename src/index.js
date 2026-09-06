@@ -307,7 +307,7 @@ function getHomePage(proxyBase) {
         </div>
       </div>
     </div>
-
+  </dive>
   <!-- Video.js JavaScript -->
   <script src="//vjs.zencdn.net/8.23.6/video.min.js"></script>
   <!-- VHS (HTTP Streaming) plugin for HLS and DASH -->
