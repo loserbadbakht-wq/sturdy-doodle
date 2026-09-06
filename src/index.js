@@ -208,7 +208,7 @@ function getHomePage(proxyBase) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Media Proxy Player</title>
   <!-- Video.js CSS -->
-  <link href="https://raw.githubusercontent.com/dubcanada/moonify/refs/heads/master/css/moo.css" rel="stylesheet">
+  <link href="//vjs.zencdn.net/8.23.6/video-js.min.css" rel="stylesheet">
   <style>
     body {
       background-color: #141414;
