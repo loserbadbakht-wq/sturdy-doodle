@@ -317,7 +317,7 @@ function getHomePage(proxyBase) {
       fluid: true,
       responsive: true,
       playbackRates: [0.5, 1, 1.5, 2],
-      controls: off,
+      controls: true,
       preload: 'auto',
       poster: 'https://gamefa.com/wp-content/uploads/2024/02/Star-Wars-Outlaws.jpg'
     });
