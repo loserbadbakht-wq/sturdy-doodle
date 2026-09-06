@@ -235,9 +235,6 @@ function getHomePage(proxyBase) {
       display: flex;
       gap: 8px;
       align-items: center;
-      margin-top: 10rem;
-      border-top: 1px solid
-      
     }
     input[type="text"] {
       flex: 1;
@@ -288,6 +285,7 @@ function getHomePage(proxyBase) {
         id="my-player"
         class="video-js vjs-big-play-centered"
         width="100%"
+        height="100%"
         >
         <source src="//vjs.zencdn.net/v/oceans.mp4" type="video/mp4"></source>
         <source src="//vjs.zencdn.net/v/oceans.webm" type="video/webm"></source>
