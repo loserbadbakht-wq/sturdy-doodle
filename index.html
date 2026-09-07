@@ -1,14 +1,438 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video.js 10 — URL Player</title>
+
+    <!-- Video.js 10 CSS & JS (stable) -->
+    <link href="https://vjs.zencdn.net/10.0.0/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/10.0.0/video.min.js">
+    </script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #0b0b0f;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 960px;
+            width: 100%;
+            background: #18181e;
+            border-radius: 24px;
+            padding: 32px 28px 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            border: 1px solid #2a2a32;
+        }
+
+        /* ---- URL bar ---- */
+        .url-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+        }
+
+        .url-bar input {
+            flex: 1;
+            min-width: 200px;
+            padding: 14px 20px;
+            border-radius: 40px;
+            border: 1px solid #33333e;
+            background: #0f0f14;
+            color: #eee;
+            font-size: 1rem;
+            outline: none;
+            transition: border 0.2s, box-shadow 0.2s;
+            font-family: inherit;
+        }
+
+        .url-bar input::placeholder {
+            color: #555;
+            font-weight: 300;
+            letter-spacing: 0.2px;
+        }
+
+        .url-bar input:focus {
+            border-color: #6c5ce7;
+            box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.25);
+        }
+
+        .url-bar button {
+            padding: 14px 32px;
+            border: none;
+            border-radius: 40px;
+            background: linear-gradient(135deg, #6c5ce7, #a855f7);
+            color: #fff;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.2s;
+            box-shadow: 0 4px 16px rgba(108, 92, 231, 0.35);
+            white-space: nowrap;
+            font-family: inherit;
+        }
+
+        .url-bar button:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 24px rgba(108, 92, 231, 0.5);
+        }
+
+        .url-bar button:active {
+            transform: scale(0.97);
+        }
+
+        /* ---- presets ---- */
+        .presets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 28px;
+        }
+
+        .presets span {
+            color: #888;
+            font-size: 0.85rem;
+            font-weight: 500;
+            align-self: center;
+            margin-right: 4px;
+        }
+
+        .presets button {
+            padding: 6px 16px;
+            border-radius: 40px;
+            border: 1px solid #2e2e3a;
+            background: #121218;
+            color: #bbb;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, border-color 0.2s;
+            font-family: inherit;
+        }
+
+        .presets button:hover {
+            background: #1e1e28;
+            color: #fff;
+            border-color: #6c5ce7;
+        }
+
+        /* ---- video wrapper ---- */
+        .video-wrapper {
+            border-radius: 16px;
+            overflow: hidden;
+            background: #000;
+            position: relative;
+        }
+
+        .video-wrapper .video-js {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            display: block;
+        }
+
+        /* Video.js custom skin touches */
+        .video-js .vjs-control-bar {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+
+        .video-js .vjs-big-play-button {
+            background: rgba(108, 92, 231, 0.85) !important;
+            border-radius: 50% !important;
+            width: 72px !important;
+            height: 72px !important;
+            line-height: 72px !important;
+            font-size: 2.2rem !important;
+            border: none !important;
+            box-shadow: 0 8px 32px rgba(108, 92, 231, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .video-js .vjs-big-play-button:hover {
+            transform: scale(1.06);
+            box-shadow: 0 12px 40px rgba(108, 92, 231, 0.6);
+        }
+
+        /* ---- status / error ---- */
+        .status {
+            margin-top: 16px;
+            color: #888;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 28px;
+        }
+
+        .status .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+            transition: background 0.3s;
+        }
+
+        .status .dot.idle {
+            background: #555;
+        }
+        .status .dot.loading {
+            background: #fbbf24;
+            animation: pulse 0.8s ease-in-out infinite alternate;
+        }
+        .status .dot.playing {
+            background: #34d399;
+        }
+        .status .dot.error {
+            background: #f87171;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 0.4;
+                transform: scale(0.9);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1.1);
+            }
+        }
+
+        .status .msg {
+            flex: 1;
+        }
+
+        .status .msg.error {
+            color: #f87171;
+        }
+
+        /* ---- responsive ---- */
+        @media (max-width: 600px) {
+            .container {
+                padding: 18px 14px 28px;
+            }
+            .url-bar input {
+                min-width: 140px;
+                padding: 12px 16px;
+                font-size: 0.9rem;
+            }
+            .url-bar button {
+                padding: 12px 22px;
+                font-size: 0.9rem;
+            }
+            .presets button {
+                font-size: 0.7rem;
+                padding: 4px 12px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <script type="module" src="https://media.githubusercontent.com/media/loserbadbakht-wq/beh/refs/heads/main/cdn/video.js"></script>
 
-<video-player>
-  <video-skin>
-    <video src="https://dl.gamefa.com/user2/video/2026/summer/Father%20Joe%20-%20Film%20Clip%20_Our%20Little%20Meeting_2.mp4" playsinline></video>
-  </video-skin>
-</video-player>
+    <div class="container">
+
+        <!-- URL input bar -->
+        <div class="url-bar">
+            <input
+            id="urlInput"
+            type="url"
+            placeholder="Enter video URL (MP4, WebM, HLS, etc.)"
+            value="https://stream.mux.com/BV3YZtogl89mg9VcNBhhnHm02Y34zI1nlMuMQfAbl3dM/highest.mp4"
+            spellcheck="false"
+            />
+            <button id="playBtn">▶ Play</button>
+        </div>
+
+        <!-- Preset shortcuts -->
+        <div class="presets">
+            <span>🎬 Presets:</span>
+            <button data-url="https://stream.mux.com/BV3YZtogl89mg9VcNBhhnHm02Y34zI1nlMuMQfAbl3dM/highest.mp4">Mux (MP4)</button>
+            <button data-url="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4">Big Buck Bunny</button>
+            <button data-url="https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/BigBuckBunny_360_10s_1MB.mp4">Short Bunny</button>
+            <button data-url="https://sample-videos.com/video321/mp4/240/big_buck_bunny_240p_1mb.mp4">1MB sample</button>
+        </div>
+
+        <!-- Video.js player -->
+        <div class="video-wrapper">
+            <video
+            id="myPlayer"
+            class="video-js vjs-big-play-centered"
+            controls
+            preload="auto"
+            playsinline
+            >
+            <source
+            src="https://stream.mux.com/BV3YZtogl89mg9VcNBhhnHm02Y34zI1nlMuMQfAbl3dM/highest.mp4"
+            type="video/mp4"
+            />
+            <p class="vjs-no-js">
+                Please enable JavaScript to view this video.
+            </p>
+        </video>
+    </div>
+
+    <!-- Status line -->
+    <div class="status">
+        <span class="dot idle" id="statusDot"></span>
+        <span class="msg" id="statusMsg">Ready — enter a URL and hit Play</span>
+    </div>
+
+</div>
+
+<script>
+    (function() {
+        'use strict';
+
+        // ----- DOM refs -----
+        const urlInput = document.getElementById('urlInput');
+        const playBtn = document.getElementById('playBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusMsg = document.getElementById('statusMsg');
+
+        // ----- Video.js player -----
+        const player = videojs('myPlayer', {
+            autoplay: false,
+            controls: true,
+            responsive: true,
+            fluid: true,
+            playbackRates: [0.5, 1, 1.5, 2],
+            controlBar: {
+                pictureInPictureToggle: true,
+                remainingTimeDisplay: true,
+            }
+        });
+
+        // ----- helpers -----
+        function setStatus(state, message) {
+            const states = {
+                idle: 'idle',
+                loading: 'loading',
+                playing: 'playing',
+                error: 'error',
+            };
+            const dotClass = states[state] || 'idle';
+            statusDot.className = 'dot ' + dotClass;
+            statusMsg.textContent = message;
+            statusMsg.className = 'msg' + (state === 'error' ? ' error' : '');
+        }
+
+        function loadAndPlay(url) {
+            if (!url || url.trim() === '') {
+                setStatus('error', '⚠️ Please enter a valid URL.');
+                return;
+            }
+
+            const trimmed = url.trim();
+            setStatus('loading', '⏳ Loading…');
+
+            // Try to guess MIME type from extension
+            let type = 'video/mp4';
+            const ext = trimmed.split('.').pop().toLowerCase();
+            if (ext === 'webm') type = 'video/webm';
+            else if (ext === 'ogg') type = 'video/ogg';
+            else if (ext === 'm3u8' || trimmed.includes('.m3u8')) type = 'application/x-mpegURL';
+            else if (ext === 'mpd' || trimmed.includes('.mpd')) type = 'application/dash+xml';
+
+            // Change source
+            player.src({ src: trimmed, type: type });
+
+            // Play with error handling
+            player.play().catch((err) => {
+                // Autoplay may be blocked by browser policy — that's okay,
+                // user can click the play button manually.
+                if (err.name === 'NotAllowedError') {
+                    setStatus('idle', '⏸️ Autoplay blocked. Click the play button on the player.');
+                } else {
+                    setStatus('error', '⚠️ Playback error: ' + (err.message || 'unknown'));
+                }
+            });
+
+            // Listen for actual playback
+            const onPlay = () => {
+                setStatus('playing', '▶️ Playing: ' + trimmed);
+                player.off('play', onPlay);
+                player.off('error', onError);
+            };
+
+            const onError = () => {
+                const e = player.error();
+                setStatus('error', '⚠️ Video error: ' + (e ? e.message : 'could not load source'));
+                player.off('play', onPlay);
+                player.off('error', onError);
+            };
+
+            player.one('play', onPlay);
+            player.one('error', onError);
+
+            // Also update status when playback ends
+            const onEnded = () => {
+                setStatus('idle', '✅ Playback ended.');
+                player.off('ended', onEnded);
+            };
+            player.one('ended', onEnded);
+        }
+
+        // ----- event: Play button -----
+        playBtn.addEventListener('click', function() {
+            loadAndPlay(urlInput.value);
+        });
+
+        // ----- event: Enter key on input -----
+        urlInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                loadAndPlay(urlInput.value);
+            }
+        });
+
+        // ----- event: preset buttons -----
+        document.querySelectorAll('.presets button').forEach((btn) => {
+            btn.addEventListener('click', function() {
+                const url = this.getAttribute('data-url');
+                if (url) {
+                    urlInput.value = url;
+                    loadAndPlay(url);
+                }
+            });
+        });
+
+        // ----- initial load (with default URL) -----
+        // Wait for player to be ready, then load the initial URL
+        player.ready(function() {
+            const initialUrl = urlInput.value.trim();
+            if (initialUrl) {
+                // Set the source without autoplay on first load,
+                // so the user sees the big play button.
+                const ext = initialUrl.split('.').pop().toLowerCase();
+                let type = 'video/mp4';
+                if (ext === 'webm') type = 'video/webm';
+                else if (ext === 'ogg') type = 'video/ogg';
+                else if (ext === 'm3u8' || initialUrl.includes('.m3u8')) type = 'application/x-mpegURL';
+                else if (ext === 'mpd' || initialUrl.includes('.mpd')) type = 'application/dash+xml';
+
+                player.src({ src: initialUrl, type: type });
+                setStatus('idle', '🎬 Ready — press ▶ Play');
+            }
+        });
+
+        // ----- expose player to console for debugging -----
+        window.__player = player;
+
+    })();
+</script>
+
 </body>
   </html>
