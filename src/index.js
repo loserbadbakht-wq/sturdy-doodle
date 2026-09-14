@@ -1,117 +1,98 @@
-// ===== Helper functions =====
-function encodeUrl(url) {
-  return btoa(url)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
+/**
+ * V-Bridge-Worker v2.0
+ * High-performance edge data relay.
+ * Optimized for connection persistence and resource efficiency.
+ */
 
-function decodeUrl(hash) {
-  let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
-  while (base64.length % 4) base64 += '=';
-  return atob(base64);
-}
+const D = `<html><head><title>404 Not Found</title></head><body><center><h1>404 Not Found</h1></center><hr><center>nginx</center></body></html>`;
+const F = new Set(['/favicon.ico', '/robots.txt', '/.env', '/.git', '/.well-known']);
+const H_IN = ['cf-connecting-ip', 'cf-ipcountry', 'cf-ray', 'cf-visitor', 'x-forwarded-for', 'x-real-ip', 'forwarded', 'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform'];
+const H_OUT = ['cf-ray', 'alt-svc', 'cf-cache-status', 'x-powered-by', 'x-cloudflare-request-id'];
+const P_HTTP = new Set(['80', '8080', '8880', '2052', '2082', '2086', '2095']);
 
 export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    const baseUrl = url.origin;
-    const isEmbed = url.searchParams.get('embed') === '1';
+  async fetch(r) {
+    try {
+      const u = new URL(r.url);
+      const p = u.pathname;
 
-    // ----- oEmbed endpoint -----
-    if (url.pathname === '/oembed') {
-      const requestedUrl = url.searchParams.get('url') || '';
-      let hash = '';
+      // 1. Resource Preservation (Save 100k limit)
+      if (p === '/' || F.has(p)) {
+        return new Response(p === '/' ? D : null, {
+          status: p === '/' ? 404 : 204,
+          headers: { 'content-type': 'text/html; charset=UTF-8', 'server': 'nginx', 'connection': 'close' }
+        });
+      }
+
+      const s = p.split('/').filter(Boolean);
+      if (s.length < 2) return new Response(D, { status: 404, headers: { 'server': 'nginx' } });
+
+      // 2. Smart Routing & Protocol Detection
+      let i = 0;
+      let t = 'https';
+      if (s[0] === 'http' || s[0] === 'https') { t = s[0]; i = 1; }
+
+      const h_p = s[i];
+      const t_p = '/' + s.slice(i + 1).join('/');
+      const [h, o] = h_p.split(':');
+
+      // Pre-emptive Protocol Logic: If port is HTTP-only or it's a raw IP, default to http
+      if (s[0] !== 'https') {
+        const isIP = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(h);
+        if (isIP || (o && P_HTTP.has(o))) {
+          t = 'http';
+        }
+      }
+
+      const dest = `${t}://${h_p}${t_p}${u.search}`;
+
+      // 3. Header Management
+      const n = new Headers(r.headers);
+      n.set('Host', h);
+      n.set('Connection', 'keep-alive');
+      for (const x of H_IN) n.delete(x);
+
+      // 4. Fetch Configuration
+      const cfg = {
+        method: r.method,
+        headers: n,
+        redirect: 'manual'
+      };
+      
+      if (r.signal) cfg['signal'] = r.signal;
+      cfg['cf'] = { cacheTtl: 0, cacheEverything: false, mirage: false, polish: 'off' };
+
+      if (r.method !== 'GET' && r.method !== 'HEAD') cfg.body = r.body;
+
+      // 5. Execution with Smart Fallback
+      let res;
       try {
-        const reqUrl = new URL(requestedUrl);
-        if (reqUrl.pathname.startsWith('/watch/')) {
-          hash = reqUrl.pathname.split('/watch/')[1];
+        res = await fetch(dest, cfg);
+        // If HTTPS fails on non-standard ports, try plain HTTP immediately
+        if (t === 'https' && (res.status === 525 || res.status === 521 || res.status === 526)) {
+          throw new Error();
         }
-      } catch {}
-      const videoUrl = hash ? decodeUrl(hash) : '';
-
-      const iframeSrc = `${baseUrl}/watch/${hash}?embed=1`;
-      const iframeHtml = `<iframe src="${iframeSrc}" width="100%" height="190" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
-
-      return new Response(JSON.stringify({
-        version: '1.0',
-        type: 'rich',
-        provider_name: 'MyPlayer',
-        provider_url: baseUrl,
-        title: videoUrl ? videoUrl.split('/').pop() : 'Video Player',
-        html: iframeHtml,
-        width: 640,
-        height: 400,
-        thumbnail_url: 'https://via.placeholder.com/640x360/1DB954/000000?text=Video',
-        thumbnail_width: 640,
-        thumbnail_height: 360
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
-    }
-
-    // ----- Main player page -----
-    let videoUrl = '';
-    let hash = '';
-
-    if (url.pathname.startsWith('/watch/')) {
-      hash = url.pathname.split('/watch/')[1];
-      if (hash) {
-        try {
-          videoUrl = decodeUrl(hash);
-        } catch {
-          videoUrl = '';
-        }
+      } catch (e) {
+        res = await fetch(dest.replace('https://', 'http://'), cfg);
       }
-    }
 
-    if (!videoUrl) {
-      const direct = url.searchParams.get('video');
-      if (direct) {
-        videoUrl = direct;
+      // 6. Direct Pipe for WebSocket/VoIP (Zero-Latency)
+      if (res.status === 101 || r.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+        return res;
       }
+
+      // 7. Response Masking (Stealth Engine)
+      const out = new Headers(res.headers);
+      for (const x of H_OUT) out.delete(x);
+      
+      out.set('Server', 'nginx');
+      out.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      out.set('X-Content-Type-Options', 'nosniff');
+
+      return new Response(res.body, { status: res.status, headers: out });
+
+    } catch (e) {
+      return new Response(null, { status: 499 });
     }
-
-    const title = videoUrl ? videoUrl.split('/').pop() : 'My Video Player';
-    const thumbnail = url.searchParams.get('thumb') || 'https://via.placeholder.com/640x360/1DB954/000000?text=Video';
-    const pageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
-    const oembedPageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
-
-    const htmlTemplate = `<!DOCTYPE html>
-<html>
-<head>
-</head>
-<body>
-  <script type="module" src="https://raw.githubusercontent.com/loserbadbakht-wq/beh/refs/heads/main/public/videojs/video.js"></script>
-
-<video-player>
-  <media-container>
-    <video src="https://dl.gamefa.com/user2/video/2026/summer/Father%20Joe%20-%20Film%20Clip%20_Our%20Little%20Meeting_2.mp4" playsinline></video>
-  </media-container>
-</video-player>
-</body>
-  </html>`;
-
-    const bodyClass = isEmbed ? 'embed-mode' : '';
-
-    let html = htmlTemplate
-      .replace(/__VIDEO_URL__/g, videoUrl.replace(/"/g, '&quot;'))
-      .replace(/__TITLE__/g, title.replace(/"/g, '&quot;'))
-      .replace(/__THUMBNAIL__/g, thumbnail)
-      .replace(/__PAGE_URL__/g, pageUrl)
-      .replace(/__ENCODED_PAGE_URL__/g, encodeURIComponent(oembedPageUrl))
-      .replace(/__BASE_URL__/g, baseUrl)
-      .replace(/__EMPTY_DISPLAY__/g, videoUrl ? 'none' : 'flex')
-      .replace(/__BODY_CLASS__/g, bodyClass);
-
-    return new Response(html, {
-      headers: {
-        'Content-Type': 'text/html',
-        'Cache-Control': 'no-cache, no-store, must-revalidate'
-      }
-    });
   }
 };
