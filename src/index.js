@@ -1,16 +1,23 @@
 /**
  * Cloudflare Worker — Shadowsocks / ShadowsocksR UDP Scanner
  *
- * GET  /            -> HTML page with a URL input bar
- * GET  /?url=<txt>  -> scans the txt link and lists configs
+ * GET  /              -> HTML page with a URL input bar
+ * GET  /?url=<txt>    -> scans the txt link and lists UDP-capable configs
  * GET  /api?url=<txt> -> same, but returns JSON
  *
- * Detection of "uses UDP":
- *   1. An explicit udp / udp-relay / udp_relay param in the link always wins.
- *   2. ssr://  -> ShadowsocksR has no UDP relay (TCP only).
- *   3. ss:// + obfs plugin -> TCP only.
- *   4. ss:// + v2ray/xray plugin -> UDP tunnelled.
- *   5. plain ss:// -> UDP capable (server must have it enabled).
+ * Supported link formats
+ *   ss://base64(method:pass@host:port)#tag
+ *   ss://base64(method:pass)@host:port?plugin=...#tag
+ *   ss://method:pass@host:port#tag                     (SIP002)
+ *   ssr://base64(host:port:proto:method:obfs:b64pass/?params)#tag
+ *   ssr://host:port:proto:method:obfs:b64pass/?params#tag   (plaintext form)
+ *
+ * "Uses UDP" logic
+ *   1. explicit udp / udp-relay / udp_relay param  -> wins
+ *   2. ssr://                                      -> never (TCP only)
+ *   3. ss:// + obfs plugin                         -> TCP only
+ *   4. ss:// + v2ray/xray plugin                   -> UDP tunnelled
+ *   5. plain ss://                                 -> UDP capable
  */
 
 const UA =
@@ -18,7 +25,7 @@ const UA =
   '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 /* ------------------------------------------------------------------ */
-/* Helpers                                                             */
+/* Base64 helpers                                                      */
 /* ------------------------------------------------------------------ */
 
 function b64decode(input) {
@@ -31,10 +38,18 @@ function b64decode(input) {
   return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
 }
 
+/**
+ * Decode base64 but return null when the input is not base64 or when the
+ * result looks like binary garbage. This stops plain text such as "mypass"
+ * from being "decoded" into control characters.
+ */
 function tryB64decode(s) {
   try {
     const out = b64decode(s);
-    return out === '' ? null : out;
+    if (!out) return null;
+    // reject replacement chars and control chars (tab/newline/CR allowed)
+    if (/[\uFFFD\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(out)) return null;
+    return out;
   } catch {
     return null;
   }
@@ -116,9 +131,9 @@ function parseSS(raw) {
     }
   } else {
     const d = tryB64decode(rest);
-    if (d === null) throw new Error('Invalid ss:// payload');
+    if (d === null) throw new Error('Invalid ss:// payload (not base64, no userinfo@host)');
     const at2 = d.lastIndexOf('@');
-    if (at2 === -1) throw new Error('Invalid ss:// payload');
+    if (at2 === -1) throw new Error('Invalid ss:// payload (no @ separator)');
     userinfo = d.slice(0, at2);
     hostport = d.slice(at2 + 1);
   }
@@ -155,12 +170,14 @@ function parseSSR(raw) {
 
   let rest = raw.slice(6); // strip "ssr://"
 
+  // ---- fragment (#remarks) ----
   const hash = rest.indexOf('#');
   if (hash !== -1) {
     cfg.remarks = safeDecode(rest.slice(hash + 1)).trim();
     rest = rest.slice(0, hash);
   }
 
+  // ---- query string ----
   let query = '';
   const q = rest.indexOf('/?');
   if (q !== -1) {
@@ -175,21 +192,26 @@ function parseSSR(raw) {
   }
   rest = rest.replace(/\/+$/, '');
 
-  const decoded = tryB64decode(rest);
-  if (decoded === null) throw new Error('Invalid ssr:// payload');
+  // ---- body: base64 form OR plaintext form ----
+  let body = tryB64decode(rest);
+  if (body === null || body.split(':').length < 6) {
+    body = safeDecode(rest); // plaintext form
+  }
+  if (!body || body.split(':').length < 6) {
+    throw new Error('Malformed SSR payload (expected at least 6 ":"-separated fields)');
+  }
 
-  const parts = decoded.split(':');
-  if (parts.length < 6) throw new Error('Malformed SSR payload (expected 6 fields)');
-
+  const parts = body.split(':');
   cfg.host = parts[0];
   cfg.port = parts[1];
   cfg.protocol = parts[2];
   cfg.method = parts[3];
   cfg.obfs = parts[4];
 
-  const passB64 = parts.slice(5).join(':');
-  cfg.password = tryB64decode(passB64) ?? passB64;
+  const passRaw = parts.slice(5).join(':');
+  cfg.password = tryB64decode(passRaw) ?? passRaw;
 
+  // ---- query params ----
   for (const [k, v] of new URLSearchParams(query)) {
     const key = k.toLowerCase();
     if (key === 'remarks') {
@@ -260,12 +282,22 @@ function maybeDecodeBase64(text) {
   return text;
 }
 
-function extractUriFromLine(line) {
-  const m = /(^|[\s,;|])(ssr?:\/\/)/.exec(line);
-  if (!m) return null;
-  const start = m.index + m[1].length;
-  const uri = line.slice(start).trim();
-  return uri.length > 6 ? uri : null;
+/** Find every ss:// / ssr:// URI on a line (handles several per line). */
+function extractUrisFromLine(line) {
+  const out = [];
+  const re = /ssr?:\/\//gi;
+  const marks = [];
+  let m;
+  while ((m = re.exec(line)) !== null) marks.push(m.index);
+  if (!marks.length) return out;
+
+  for (let i = 0; i < marks.length; i++) {
+    const start = marks[i];
+    const end = i + 1 < marks.length ? marks[i + 1] : line.length;
+    const uri = line.slice(start, end).trim();
+    if (uri.length > 6) out.push(uri);
+  }
+  return out;
 }
 
 async function scan(target) {
@@ -283,23 +315,24 @@ async function scan(target) {
   }
 
   const rawText = await res.text();
-  const text = maybeDecodeBase64(rawText);
+  const text = maybeDecodeBase64(rawText).replace(/^\uFEFF/, '');
+
+  const lines = text.split(/\r\n|\r|\n/);
 
   const configs = [];
   const errors = [];
 
-  for (const line of text.split(/\r?\n/)) {
-    const uri = extractUriFromLine(line);
-    if (!uri) continue;
-
-    try {
-      const cfg = uri.startsWith('ssr://') ? parseSSR(uri) : parseSS(uri);
-      const d = detectUdp(cfg);
-      cfg.udp = d.udp;
-      cfg.udpReason = d.reason;
-      configs.push(cfg);
-    } catch (e) {
-      errors.push({ uri: uri.slice(0, 120), error: String((e && e.message) || e) });
+  for (const line of lines) {
+    for (const uri of extractUrisFromLine(line)) {
+      try {
+        const cfg = uri.startsWith('ssr://') ? parseSSR(uri) : parseSS(uri);
+        const d = detectUdp(cfg);
+        cfg.udp = d.udp;
+        cfg.udpReason = d.reason;
+        configs.push(cfg);
+      } catch (e) {
+        errors.push({ uri: uri.slice(0, 160), error: String((e && e.message) || e) });
+      }
     }
   }
 
@@ -312,7 +345,9 @@ async function scan(target) {
     parseErrors: errors.length,
   };
 
-  return { configs, stats, errors };
+  const preview = lines.filter((l) => l.trim()).slice(0, 30);
+
+  return { configs, stats, errors, preview };
 }
 
 /* ------------------------------------------------------------------ */
@@ -332,6 +367,7 @@ const STYLE = `
   .wrap{max-width:1400px;margin:0 auto}
   h1{font-size:22px;margin:0 0 4px}
   .sub{color:var(--muted);font-size:13px;margin:0 0 20px}
+  .sub code,footer code{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
   form{display:flex;gap:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--border);
        border-radius:12px;padding:14px;margin-bottom:18px}
   input[type=url]{
@@ -354,6 +390,9 @@ const STYLE = `
   .alert{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--accent);
          border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:14px}
   .alert.err{border-left-color:var(--bad)}
+  pre.preview{background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:12px;
+              overflow:auto;max-height:420px;font-size:12.5px;line-height:1.45;margin-bottom:18px;
+              font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#c9d1d9;white-space:pre}
   table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);
         border-radius:12px;overflow:hidden;font-size:13px}
   th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
@@ -371,7 +410,6 @@ const STYLE = `
               padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer}
   .raw button:hover{background:#30363d}
   footer{color:var(--muted);font-size:12px;margin-top:26px;line-height:1.7}
-  footer code{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
 `;
 
 const SCRIPT = `
@@ -439,6 +477,13 @@ function renderPage({ target, showAll, result, error }) {
       ${s.parseErrors ? `<span class="pill warn">Parse errors: <b>${s.parseErrors}</b></span>` : ''}
     </div>`;
 
+    if (s.total === 0 && result.preview && result.preview.length) {
+      body += `<div class="alert err"><b>No configs could be parsed.</b>
+        Below are the first lines the Worker actually received — check that the URL points at a
+        plain-text subscription and not at an HTML page or a login wall.</div>`;
+      body += `<pre class="preview">${esc(result.preview.join('\n'))}</pre>`;
+    }
+
     const q = encodeURIComponent(target);
     body += `<p class="hint">${
       showAll ? 'Showing <b>all</b> parsed configs.' : 'Showing only configs that <b>use UDP</b>.'
@@ -446,9 +491,9 @@ function renderPage({ target, showAll, result, error }) {
       showAll ? 'Show UDP only' : 'Show all configs'
     }</a> &nbsp;·&nbsp; <a href="/api?url=${q}">JSON API</a></p>`;
 
-    if (!list.length) {
-      body += `<div class="alert">No ${showAll ? '' : 'UDP-capable '}configs found in that file.</div>`;
-    } else {
+    if (s.total > 0 && !list.length) {
+      body += `<div class="alert">No UDP-capable configs found — every parsed config is TCP only.</div>`;
+    } else if (list.length) {
       body += renderRows(list);
     }
   }
