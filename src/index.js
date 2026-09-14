@@ -1,117 +1,91 @@
-// ===== Helper functions =====
-function encodeUrl(url) {
-  return btoa(url)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-function decodeUrl(hash) {
-  let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
-  while (base64.length % 4) base64 += '=';
-  return atob(base64);
-}
+// Cloudflare Worker – YouTube No‑Cookie Embed Proxy
+// Deploy as a Worker (ES Module syntax)
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request) {
     const url = new URL(request.url);
-    const baseUrl = url.origin;
-    const isEmbed = url.searchParams.get('embed') === '1';
+    const target = url.searchParams.get('url');
 
-    // ----- oEmbed endpoint -----
-    if (url.pathname === '/oembed') {
-      const requestedUrl = url.searchParams.get('url') || '';
-      let hash = '';
-      try {
-        const reqUrl = new URL(requestedUrl);
-        if (reqUrl.pathname.startsWith('/watch/')) {
-          hash = reqUrl.pathname.split('/watch/')[1];
-        }
-      } catch {}
-      const videoUrl = hash ? decodeUrl(hash) : '';
-
-      const iframeSrc = `${baseUrl}/watch/${hash}?embed=1`;
-      const iframeHtml = `<iframe src="${iframeSrc}" width="100%" height="190" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
-
-      return new Response(JSON.stringify({
-        version: '1.0',
-        type: 'rich',
-        provider_name: 'MyPlayer',
-        provider_url: baseUrl,
-        title: videoUrl ? videoUrl.split('/').pop() : 'Video Player',
-        html: iframeHtml,
-        width: 640,
-        height: 400,
-        thumbnail_url: 'https://via.placeholder.com/640x360/1DB954/000000?text=Video',
-        thumbnail_width: 640,
-        thumbnail_height: 360
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
+    // 1. Validate the provided URL
+    if (!target) {
+      return new Response('Missing "url" parameter. Example: /?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ', {
+        status: 400,
+        headers: { 'Content-Type': 'text/plain' },
       });
     }
 
-    // ----- Main player page -----
-    let videoUrl = '';
-    let hash = '';
+    let videoId = null;
+    let playlistId = null;
 
-    if (url.pathname.startsWith('/watch/')) {
-      hash = url.pathname.split('/watch/')[1];
-      if (hash) {
-        try {
-          videoUrl = decodeUrl(hash);
-        } catch {
-          videoUrl = '';
+    try {
+      const u = new URL(target);
+      // Extract video ID from standard watch URLs, short youtu.be links, or embed URLs
+      if (u.hostname === 'youtu.be') {
+        videoId = u.pathname.slice(1);
+      } else if (u.hostname.endsWith('youtube.com')) {
+        if (u.pathname === '/watch') {
+          videoId = u.searchParams.get('v');
+        } else if (u.pathname.startsWith('/embed/')) {
+          videoId = u.pathname.split('/')[2];
+        } else if (u.pathname === '/playlist') {
+          playlistId = u.searchParams.get('list');
         }
       }
+    } catch {
+      // Invalid URL
     }
 
-    if (!videoUrl) {
-      const direct = url.searchParams.get('video');
-      if (direct) {
-        videoUrl = direct;
-      }
+    if (!videoId && !playlistId) {
+      return new Response('Invalid YouTube URL. Provide a watch, youtu.be, embed, or playlist link.', {
+        status: 400,
+        headers: { 'Content-Type': 'text/plain' },
+      });
     }
 
-    const title = videoUrl ? videoUrl.split('/').pop() : 'My Video Player';
-    const thumbnail = url.searchParams.get('thumb') || 'https://via.placeholder.com/640x360/1DB954/000000?text=Video';
-    const pageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
-    const oembedPageUrl = hash ? `${baseUrl}/watch/${hash}` : url.href;
+    // 2. Build the no‑cookie embed URL (https://www.youtube-nocookie.com/embed/…)
+    const embedBase = 'https://www.youtube-nocookie.com/embed/';
+    let embedUrl = '';
+    if (videoId) {
+      embedUrl = `${embedBase}${videoId}`;
+    } else if (playlistId) {
+      embedUrl = `${embedBase}videoseries?list=${playlistId}`;
+    }
 
-    const htmlTemplate = `<!DOCTYPE html>
-<html>
+    // 3. Return an HTML page with the iframe
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube No‑Cookie Embed</title>
+  <style>
+    body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #000; }
+    iframe { width: 100%; max-width: 960px; aspect-ratio: 16 / 9; border: 0; }
+  </style>
 </head>
 <body>
-  <script type="module" src="https://raw.githubusercontent.com/loserbadbakht-wq/beh/refs/heads/main/public/videojs/video.js"></script>
-
-<video-player>
-  <media-container>
-    <video src="https://dl.gamefa.com/user2/video/2026/summer/Father%20Joe%20-%20Film%20Clip%20_Our%20Little%20Meeting_2.mp4" playsinline></video>
-  </media-container>
-</video-player>
+  <iframe
+    src="${embedUrl}"
+    title="YouTube video player"
+    frameborder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    allowfullscreen
+  ></iframe>
 </body>
-  </html>`;
+</html>`.trim();
 
-    const bodyClass = isEmbed ? 'embed-mode' : '';
-
-    let html = htmlTemplate
-      .replace(/__VIDEO_URL__/g, videoUrl.replace(/"/g, '&quot;'))
-      .replace(/__TITLE__/g, title.replace(/"/g, '&quot;'))
-      .replace(/__THUMBNAIL__/g, thumbnail)
-      .replace(/__PAGE_URL__/g, pageUrl)
-      .replace(/__ENCODED_PAGE_URL__/g, encodeURIComponent(oembedPageUrl))
-      .replace(/__BASE_URL__/g, baseUrl)
-      .replace(/__EMPTY_DISPLAY__/g, videoUrl ? 'none' : 'flex')
-      .replace(/__BODY_CLASS__/g, bodyClass);
-
-    return new Response(html, {
-      headers: {
-        'Content-Type': 'text/html',
-        'Cache-Control': 'no-cache, no-store, must-revalidate'
-      }
+    // 4. Set privacy‑enhancing headers
+    const headers = new Headers({
+      'Content-Type': 'text/html; charset=utf-8',
+      // Prevent the browser from sending the referrer to YouTube
+      'Referrer-Policy': 'no-referrer',
+      // Optional: restrict which origins can embed this page
+      // 'Content-Security-Policy': "frame-ancestors 'self'",
+      // Cache for a short time to reduce repeated requests
+      'Cache-Control': 'public, max-age=300',
     });
-  }
+
+    return new Response(html, { headers });
+  },
 };
