@@ -1,253 +1,211 @@
-// Cloudflare Worker: Scan Shadowsocks configs for UDP support
-export default {
-  async fetch(request) {
-    const { method, url } = request;
-
-    // Serve the HTML form on GET requests
-    if (method === "GET") {
-      return new Response(getFormHTML(), {
-        headers: { "content-type": "text/html;charset=UTF-8" },
-      });
-    }
-
-    // Handle form submission on POST
-    if (method === "POST") {
-      const formData = await request.formData();
-      const txtUrl = formData.get("url");
-
-      if (!txtUrl) {
-        return new Response("Missing URL parameter", { status: 400 });
-      }
-
-      try {
-        // Fetch the text file
-        const resp = await fetch(txtUrl);
-        if (!resp.ok) {
-          throw new Error(`Failed to fetch: ${resp.status} ${resp.statusText}`);
-        }
-        const text = await resp.text();
-
-        // Parse lines and filter for UDP-enabled SS configs
-        const lines = text.split(/\r?\n/);
-        const results = [];
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith("#")) continue;
-
-          const info = parseSSConfig(trimmed);
-          if (info && info.udp) {
-            results.push(info);
-          }
-        }
-
-        // Return the results as an HTML page
-        return new Response(getResultsHTML(results, txtUrl), {
-          headers: { "content-type": "text/html;charset=UTF-8" },
-        });
-      } catch (err) {
-        return new Response(`Error: ${err.message}`, { status: 500 });
-      }
-    }
-
-    return new Response("Method not allowed", { status: 405 });
-  },
-};
-
-/**
- * Parses a Shadowsocks URI and returns an object with UDP support info.
- * Supports SIP002 and legacy formats.
- * @param {string} uri
- * @returns {{uri: string, udp: boolean, reason: string} | null}
- */
-function parseSSConfig(uri) {
-  // Only handle ss:// URIs
-  if (!uri.startsWith("ss://")) return null;
-
-  try {
-    // Split off the fragment (tag) and query
-    const withoutFragment = uri.split("#")[0];
-    const [base, queryString] = withoutFragment.split("?");
-
-    // Parse the query parameters
-    const params = new URLSearchParams(queryString || "");
-    const udpParam = params.get("udp");
-    const udpRelayParam = params.get("udp-relay");
-    const pluginParam = params.get("plugin");
-
-    // Check for UDP indicators
-    let udp = false;
-    let reason = "";
-
-    // 1. Query parameter udp=true / udp=1
-    if (udpParam === "true" || udpParam === "1") {
-      udp = true;
-      reason = "udp=true in query";
-    }
-    // 2. Query parameter udp-relay=true
-    else if (udpRelayParam === "true") {
-      udp = true;
-      reason = "udp-relay=true in query";
-    }
-    // 3. Plugin options may indicate UDP (e.g., v2ray-plugin;mode=quic)
-    else if (pluginParam) {
-      const pluginLower = pluginParam.toLowerCase();
-      if (
-        pluginLower.includes("mode=quic") ||
-        pluginLower.includes("mode=udp") ||
-        pluginLower.includes("udp")
-      ) {
-        udp = true;
-        reason = `plugin indicates UDP (${pluginParam})`;
-      }
-    }
-
-    // 4. For SIP002 JSON payloads (base64-encoded JSON after ss://)
-    //    Also check for a top-level "udp" field.
-    if (!udp) {
-      // Try to detect a base64-encoded JSON blob in the userinfo part
-      const afterScheme = base.replace("ss://", "");
-      // A simple heuristic: if it looks like base64 and contains no '@', it might be JSON
-      if (/^[A-Za-z0-9+/=]+$/.test(afterScheme) && !afterScheme.includes("@")) {
-        try {
-          const decoded = atob(afterScheme);
-          const json = JSON.parse(decoded);
-          if (json.udp === true) {
-            udp = true;
-            reason = "udp=true in decoded JSON";
-          }
-        } catch (_) {
-          // Not JSON, ignore
-        }
-      }
-    }
-
-    if (udp) {
-      return { uri, udp: true, reason };
-    }
-    return { uri, udp: false, reason: "" };
-  } catch (e) {
-    return null; // Invalid URI
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UDP Config Scanner</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c232c; --line:#2a323d;
+    --txt:#e6edf3; --dim:#8b949e; --acc:#58a6ff;
+    --yes:#3fb950; --no:#f85149; --warn:#d29922;
   }
-}
-
-/**
- * Returns the HTML for the input form.
- */
-function getFormHTML() {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Shadowsocks UDP Scanner</title>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-    label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
-    input[type="url"] { width: 100%; padding: 0.75rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-    button { margin-top: 1rem; padding: 0.75rem 1.5rem; font-size: 1rem; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
-    button:hover { background: #1d4ed8; }
-    .hint { color: #666; font-size: 0.9rem; margin-top: 0.5rem; }
-  </style>
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:28px 16px 80px}
+  h1{font-size:22px;margin:0 0 6px}
+  .sub{color:var(--dim);font-size:14px;margin:0 0 20px}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:12px}
+  .bar{display:flex;gap:8px}
+  .bar input{
+    flex:1;min-width:0;padding:11px 13px;border-radius:8px;
+    border:1px solid var(--line);background:var(--panel);color:var(--txt);
+    font-size:14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  .bar input:focus{outline:none;border-color:var(--acc)}
+  button{
+    padding:11px 18px;border-radius:8px;border:1px solid transparent;
+    background:var(--acc);color:#04121f;font-weight:600;font-size:14px;cursor:pointer;
+  }
+  button:hover{filter:brightness(1.1)}
+  button:disabled{opacity:.5;cursor:default}
+  .bar2{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+  .bar2 label{font-size:13px;color:var(--dim);display:flex;gap:6px;align-items:center;cursor:pointer}
+  .ghost{background:transparent;border:1px solid var(--line);color:var(--txt);font-weight:500;padding:7px 12px;font-size:13px}
+  .ghost:hover{border-color:var(--acc);color:var(--acc);filter:none}
+  .status{margin-top:16px;font-size:13px;color:var(--dim);min-height:20px}
+  .status.err{color:var(--no)}
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 6px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px}
+  .stat b{font-size:16px;display:block}
+  .stat.g b{color:var(--yes)}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--no);
+    border-radius:10px;padding:12px 14px;margin-top:10px;
+  }
+  .card.is-udp{border-left-color:var(--yes)}
+  .row1{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .ttl{font-weight:600;font-size:14px;word-break:break-word}
+  .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.4px}
+  .badge.yes{background:rgba(63,185,80,.15);color:var(--yes);border:1px solid rgba(63,185,80,.4)}
+  .badge.no{background:rgba(248,81,73,.12);color:var(--no);border:1px solid rgba(248,81,73,.35)}
+  .row2{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:var(--acc);margin-top:2px;word-break:break-all}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .tag{font-size:11px;background:var(--panel2);border:1px solid var(--line);color:var(--dim);padding:2px 7px;border-radius:5px}
+  .why{font-size:12px;color:var(--warn);margin-top:8px}
+  .raw{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:#6e7681;
+    margin-top:8px;word-break:break-all;max-height:44px;overflow:hidden;
+  }
+  .copy{
+    margin-top:10px;padding:5px 12px;font-size:12px;background:transparent;
+    border:1px solid var(--line);color:var(--dim);font-weight:500;
+  }
+  .copy:hover{border-color:var(--acc);color:var(--acc);filter:none}
+  .empty{color:var(--dim);font-size:14px;padding:24px 0;text-align:center}
+  .note{margin-top:28px;font-size:12px;color:#6e7681;border-top:1px solid var(--line);padding-top:14px}
+</style>
 </head>
 <body>
-  <h1>Shadowsocks UDP Scanner</h1>
-  <p>Enter the URL of a text file containing <code>ss://</code> configurations (one per line).</p>
-  <form method="POST">
-    <label for="url">Text file URL</label>
-    <input type="url" id="url" name="url" placeholder="https://example.com/configs.txt" required>
-    <div class="hint">The file should contain one Shadowsocks URI per line.</div>
-    <button type="submit">Scan for UDP support</button>
-  </form>
-</body>
-</html>`;
-}
+<div class="wrap">
+  <h1>🔍 UDP Config Scanner</h1>
+  <p class="sub">Paste a subscription <code>.txt</code> link — it gets fetched, every Shadowsocks / ShadowsocksR config is parsed, and the ones that relay <b>UDP</b> are listed first.</p>
 
-/**
- * Returns the HTML for the results page.
- * @param {Array} results
- * @param {string} sourceUrl
- */
-function getResultsHTML(results, sourceUrl) {
-  if (results.length === 0) {
-    return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UDP Scan Results</title>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-    .back { margin-bottom: 1rem; }
-    .back a { color: #2563eb; text-decoration: none; }
-    .back a:hover { text-decoration: underline; }
-  </style>
-</head>
-<body>
-  <div class="back"><a href="/">← Scan another file</a></div>
-  <h1>UDP Scan Results</h1>
-  <p>No Shadowsocks configurations with UDP support found in <code>${escapeHtml(sourceUrl)}</code>.</p>
-</body>
-</html>`;
+  <div class="bar">
+    <input id="url" type="url" placeholder="https://example.com/sub.txt" spellcheck="false" autocomplete="off">
+    <button id="go">Scan</button>
+  </div>
+
+  <div class="bar2">
+    <label><input type="checkbox" id="showAll"> show non-UDP as well</label>
+    <button class="ghost" id="copyUdp">Copy UDP links</button>
+    <button class="ghost" id="openTxt">Open UDP as plain text</button>
+  </div>
+
+  <div id="status" class="status"></div>
+  <div id="stats" class="stats"></div>
+  <div id="out"></div>
+
+  <div class="note">
+    <b>How “UDP” is decided</b> (heuristic — no live probing is possible from a Worker):<br>
+    • <b>ss://</b> → UDP is relayed by default. If a plugin is present, only <code>v2ray-plugin</code>/<code>xray-plugin</code> with <code>mode=quic</code> is treated as UDP-capable.<br>
+    • <b>ssr://</b> → <code>origin</code>, <code>auth_sha1_v4</code>, <code>auth_aes128_md5</code>, <code>auth_aes128_sha1</code> relay UDP; the <code>auth_chain_*</code> family does not.<br>
+    • Everything else is skipped.
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var lastData = null;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
   }
 
-  const rows = results
-    .map(
-      (r) => `
-    <tr>
-      <td><code>${escapeHtml(r.uri)}</code></td>
-      <td>${escapeHtml(r.reason)}</td>
-    </tr>`
-    )
-    .join("");
+  function setStatus(msg, isErr) {
+    var el = $('status');
+    el.textContent = msg || '';
+    el.className = 'status' + (isErr ? ' err' : '');
+  }
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UDP Scan Results</title>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-    .back { margin-bottom: 1rem; }
-    .back a { color: #2563eb; text-decoration: none; }
-    .back a:hover { text-decoration: underline; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e5e7eb; }
-    th { background: #f9fafb; font-weight: 600; }
-    td code { word-break: break-all; font-size: 0.9rem; }
-    .count { color: #666; margin-top: 1rem; }
-  </style>
-</head>
-<body>
-  <div class="back"><a href="/">← Scan another file</a></div>
-  <h1>UDP Scan Results</h1>
-  <p>Found <strong>${results.length}</strong> Shadowsocks configuration(s) with UDP support in <code>${escapeHtml(sourceUrl)}</code>.</p>
-  <table>
-    <thead>
-      <tr>
-        <th>Configuration URI</th>
-        <th>Reason</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rows}
-    </tbody>
-  </table>
+  function card(it) {
+    var title = it.remarks ? it.remarks : (it.host + ':' + it.port);
+    var h = '';
+    h += '<div class="card ' + (it.udp ? 'is-udp' : '') + '">';
+    h += '<div class="row1"><span class="ttl">' + esc(title) + '</span>';
+    h += it.udp ? '<span class="badge yes">UDP ✓</span>' : '<span class="badge no">no UDP</span>';
+    h += '</div>';
+    h += '<div class="row2">' + esc(it.host) + ':' + esc(it.port) + '</div>';
+    h += '<div class="tags">';
+    h += '<span class="tag">' + esc(String(it.type).toUpperCase()) + '</span>';
+    if (it.protocol) h += '<span class="tag">proto: ' + esc(it.protocol) + '</span>';
+    if (it.method) h += '<span class="tag">' + esc(it.method) + '</span>';
+    if (it.obfs) h += '<span class="tag">obfs: ' + esc(it.obfs) + '</span>';
+    if (it.plugin) h += '<span class="tag">plugin: ' + esc(it.plugin) + '</span>';
+    h += '</div>';
+    h += '<div class="why">' + esc(it.reason) + '</div>';
+    h += '<div class="raw">' + esc(it.raw) + '</div>';
+    h += '<button class="copy" data-copy="' + esc(it.raw) + '">Copy link</button>';
+    h += '</div>';
+    return h;
+  }
+
+  function render(data) {
+    var items = data.items || [];
+    var showAll = $('showAll').checked;
+    var list = showAll ? items : items.filter(function (i) { return i.udp; });
+
+    $('stats').innerHTML =
+      '<div class="stat"><b>' + data.total + '</b>configs parsed</div>' +
+      '<div class="stat g"><b>' + data.udpCount + '</b>support UDP</div>' +
+      (data.skipped ? '<div class="stat"><b>' + data.skipped + '</b>lines skipped</div>' : '');
+
+    if (!list.length) {
+      $('out').innerHTML = '<div class="empty">' +
+        (items.length ? 'No UDP-capable configs found.' : 'No Shadowsocks / ShadowsocksR configs found in that file.') +
+        '</div>';
+      return;
+    }
+    $('out').innerHTML = list.map(card).join('');
+  }
+
+  function scan() {
+    var url = $('url').value.trim();
+    if (!url) { setStatus('Please enter a subscription link.', true); return; }
+    $('go').disabled = true;
+    $('out').innerHTML = '';
+    $('stats').innerHTML = '';
+    setStatus('Fetching subscription…');
+
+    fetch('/api/scan?url=' + encodeURIComponent(url))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) { setStatus('Error: ' + data.error, true); return; }
+        lastData = data;
+        setStatus('Loaded ' + data.total + ' configs from ' + data.source);
+        render(data);
+      })
+      .catch(function (e) { setStatus('Error: ' + e.message, true); })
+      .finally(function () { $('go').disabled = false; });
+  }
+
+  $('go').addEventListener('click', scan);
+  $('url').addEventListener('keydown', function (e) { if (e.key === 'Enter') scan(); });
+  $('showAll').addEventListener('change', function () { if (lastData) render(lastData); });
+
+  $('out').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-copy]');
+    if (!btn) return;
+    var txt = btn.getAttribute('data-copy');
+    navigator.clipboard.writeText(txt).then(function () {
+      var old = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(function () { btn.textContent = old; }, 1200);
+    });
+  });
+
+  $('copyUdp').addEventListener('click', function () {
+    if (!lastData) { setStatus('Scan something first.', true); return; }
+    var links = lastData.items.filter(function (i) { return i.udp; }).map(function (i) { return i.raw; }).join('\n');
+    if (!links) { setStatus('No UDP configs to copy.', true); return; }
+    navigator.clipboard.writeText(links).then(function () {
+      setStatus('Copied ' + links.split('\n').length + ' UDP links to clipboard.');
+    });
+  });
+
+  $('openTxt').addEventListener('click', function () {
+    var url = $('url').value.trim();
+    if (!url) { setStatus('Enter a subscription link first.', true); return; }
+    window.open('/api/scan?format=text&url=' + encodeURIComponent(url), '_blank');
+  });
+})();
+</script>
 </body>
-</html>`;
-}
-
-/**
- * Escapes HTML special characters.
- * @param {string} str
- * @returns {string}
- */
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-                  }
+</html>
