@@ -1,5 +1,5 @@
 // worker.js
-import jikanjs from 'https://esm.sh/jikanjs@0.7.0';
+import jikanjs from 'jikanjs';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -19,12 +19,10 @@ function jsonResponse(data, status = 200) {
 
 export default {
   async fetch(request, env, ctx) {
-    // Handle CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: CORS_HEADERS });
     }
 
-    // Only allow GET requests
     if (request.method !== 'GET') {
       return jsonResponse({ error: 'Method not allowed' }, 405);
     }
@@ -34,7 +32,6 @@ export default {
     const segments = path ? path.split('/') : [];
     const query = url.searchParams;
 
-    // Root endpoint: list available routes
     if (segments.length === 0) {
       return jsonResponse({
         message: 'Jikan API Proxy',
@@ -56,7 +53,6 @@ export default {
     try {
       const [resource, id, subresource] = segments;
 
-      // ── Anime ──────────────────────────────────────────────
       if (resource === 'anime' && id) {
         const data = await jikanjs.loadAnime(
           Number(id),
@@ -65,7 +61,6 @@ export default {
         return jsonResponse(data);
       }
 
-      // ── Manga ──────────────────────────────────────────────
       if (resource === 'manga' && id) {
         const data = await jikanjs.loadManga(
           Number(id),
@@ -74,7 +69,6 @@ export default {
         return jsonResponse(data);
       }
 
-      // ── Character ──────────────────────────────────────────
       if (resource === 'character' && id) {
         const data = await jikanjs.loadCharacter(
           Number(id),
@@ -83,7 +77,6 @@ export default {
         return jsonResponse(data);
       }
 
-      // ── Search ─────────────────────────────────────────────
       if (resource === 'search' && id) {
         const q = query.get('q');
         if (!q) {
@@ -95,7 +88,6 @@ export default {
         return jsonResponse(data);
       }
 
-      // ── Top ────────────────────────────────────────────────
       if (resource === 'top' && id) {
         const page = query.get('page') ? Number(query.get('page')) : undefined;
         const subtype = query.get('subtype') || undefined;
@@ -103,19 +95,16 @@ export default {
         return jsonResponse(data);
       }
 
-      // ── Season ─────────────────────────────────────────────
       if (resource === 'season' && id && subresource) {
         const data = await jikanjs.loadSeason(Number(id), subresource);
         return jsonResponse(data);
       }
 
-      // ── Schedule ───────────────────────────────────────────
       if (resource === 'schedule' && id) {
         const data = await jikanjs.loadSchedule(id);
         return jsonResponse(data);
       }
 
-      // ── Fallback ───────────────────────────────────────────
       return jsonResponse({ error: 'Not found' }, 404);
     } catch (err) {
       console.error('Jikan API error:', err);
