@@ -1,2 +1,17 @@
-npm init -y
-npm install jikanjs
+{
+  "name": "loser-jikan",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "worker.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "dependencies": {
+    "jikanjs": "^0.7.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.86.0"
+  }
+}
