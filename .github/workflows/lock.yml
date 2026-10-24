@@ -25,8 +25,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Download files
         id: dl
@@ -163,37 +161,16 @@ jobs:
           echo "=== Targets to commit ==="
           printf '%s\n' "${UNIQUE_TARGETS[@]}"
 
-      - name: Commit and push with Git LFS
+      - name: Commit and push
         env:
           TARGETS_RAW: ${{ steps.dl.outputs.targets }}
         run: |
           set -euo pipefail
-          git lfs install
-
-          # Escape fnmatch special chars so literal [] (if ever used) match in .gitattributes
-          escape_gitattr() {
-            local s="$1"
-            s="${s//\\/\\\\}"
-            s="${s//\[/\\[}"
-            s="${s//\]/\\]}"
-            s="${s//\*/\\*}"
-            s="${s//\?/\\?}"
-            printf '%s' "$s"
-          }
-
-          while IFS= read -r t; do
-            [ -z "$t" ] && continue
-            if [ -d "$t" ]; then
-              git lfs track "$(escape_gitattr "$t")/**"
-            else
-              git lfs track "$(escape_gitattr "$t")"
-            fi
-          done <<< "$TARGETS_RAW"
-          git add .gitattributes
 
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          # preserve empty dirs (only matters if folder_name is set and extraction was empty)
           while IFS= read -r t; do
             [ -d "$t" ] || continue
             find "$t" -type d -empty -exec touch {}/.gitkeep \;
@@ -209,5 +186,5 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Add _worker.js"
+          git commit -m "Add downloaded files"
           git push
