@@ -64,7 +64,6 @@ async function handleRequest(request) {
     if (targetPath.startsWith('http://') || targetPath.startsWith('https://')) {
       targetUrl = new URL(targetPath);
     } else {
-      // Allow protocol-relative or relative? For simplicity, we require absolute URL.
       return new Response('Invalid target URL. Must start with http:// or https://', { status: 400 });
     }
 
@@ -79,12 +78,10 @@ async function handleRequest(request) {
   // Build request headers with browser emulation
   const requestHeaders = new Headers();
 
-  // Copy essential original headers (range, cookies, etc.)
   ['cookie', 'range', 'if-none-match', 'if-modified-since', 'content-type', 'content-length'].forEach(h => {
     if (request.headers.has(h)) requestHeaders.set(h, request.headers.get(h));
   });
 
-  // Browser emulation
   requestHeaders.set('User-Agent', config.browserEmulation.userAgent);
   requestHeaders.set('Accept', config.browserEmulation.accept);
   requestHeaders.set('Accept-Language', config.browserEmulation.acceptLanguage);
@@ -92,14 +89,12 @@ async function handleRequest(request) {
   requestHeaders.set('Connection', config.browserEmulation.connection);
   requestHeaders.set('Host', targetUrl.host);
 
-  // Handle Referer and Origin carefully to avoid 403s
   const originalReferer = request.headers.get('Referer');
   const originalOrigin = request.headers.get('Origin');
 
   if (originalReferer) {
     const refererUrl = new URL(originalReferer);
     if (refererUrl.host === url.host) {
-      // It's a proxied referer; extract the actual target URL
       let inner = refererUrl.pathname.slice(1);
       if (inner.startsWith('http://') || inner.startsWith('https://')) {
         requestHeaders.set('Referer', inner);
@@ -107,11 +102,8 @@ async function handleRequest(request) {
         requestHeaders.set('Referer', targetUrl.origin);
       }
     } else {
-      // Direct referer from elsewhere, forward as-is
       requestHeaders.set('Referer', originalReferer);
     }
-  } else {
-    // No referer; omit
   }
 
   if (originalOrigin) {
@@ -122,7 +114,6 @@ async function handleRequest(request) {
       requestHeaders.set('Origin', originalOrigin);
     }
   } else {
-    // No origin; omit. For m3u8, many servers reject an Origin header, so ensure it's not set.
     if (targetUrl.pathname.endsWith('.m3u8')) {
       requestHeaders.delete('Origin');
     }
@@ -138,7 +129,6 @@ async function handleRequest(request) {
   try {
     const response = await fetch(targetUrl.href, fetchOptions);
 
-    // Copy response headers and clean problematic ones
     const responseHeaders = new Headers(response.headers);
     responseHeaders.delete('content-security-policy');
     responseHeaders.delete('content-security-policy-report-only');
@@ -150,13 +140,11 @@ async function handleRequest(request) {
     responseHeaders.set('access-control-allow-credentials', 'true');
     responseHeaders.set('x-proxied-by', 'cloudflare-worker-media-proxy');
 
-    // Copy multiple Set-Cookie headers
     const setCookies = response.headers.getAll ? response.headers.getAll('Set-Cookie') : [];
     if (setCookies.length > 0) {
       setCookies.forEach(cookie => responseHeaders.append('Set-Cookie', cookie));
     }
 
-    // Handle redirects manually (so they stay proxied)
     if ([301, 302, 307, 308].includes(response.status)) {
       const location = responseHeaders.get('Location');
       if (location) {
@@ -169,7 +157,6 @@ async function handleRequest(request) {
 
     const contentType = responseHeaders.get('content-type') || '';
 
-    // HLS playlist rewriting
     if (contentType.includes('application/vnd.apple.mpegurl') ||
         contentType.includes('application/x-mpegurl') ||
         targetUrl.pathname.endsWith('.m3u8')) {
@@ -182,7 +169,6 @@ async function handleRequest(request) {
       });
     }
 
-    // All other media: stream as-is
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -198,7 +184,7 @@ async function handleRequest(request) {
 }
 
 // ============================
-// Landing Page (Video player only)
+// Landing Page (Video.js 10 web components)
 // ============================
 function getHomePage(proxyBase) {
   return new Response(`<!DOCTYPE html>
@@ -207,12 +193,10 @@ function getHomePage(proxyBase) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Media Proxy Player</title>
-  <!-- Video.js CSS -->
-  <link href="//vjs.zencdn.net/8.23.6/video-js.min.css" rel="stylesheet">
   <style>
     body {
       background-color: #141414;
-      color: #666;
+      color: #ddd;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -220,18 +204,25 @@ function getHomePage(proxyBase) {
       min-height: 100vh;
       font-family: sans-serif;
       padding: 20px;
+      margin: 0;
     }
     .container {
       width: 100%;
       max-width: 800px;
+    }
+    .player-container {
+      width: 100%;
+      aspect-ratio: 16 / 9;
       background: #000;
       border-radius: 12px;
       overflow: hidden;
       box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      margin-bottom: 12px;
     }
     .input-group {
       padding: 8px 12px;
       background: #222;
+      border-radius: 8px;
       display: flex;
       gap: 8px;
       align-items: center;
@@ -248,10 +239,7 @@ function getHomePage(proxyBase) {
       transition: border 0.2s;
     }
     input[type="text"]:focus {
-        border-color: #0070f3;
-    }
-    input[type="text"]:hover {
-        border-color: #0070f3;
+      border-color: #0070f3;
     }
     button {
       background: #0070f3;
@@ -267,10 +255,6 @@ function getHomePage(proxyBase) {
     button:hover {
       background: #0051a8;
     }
-    .video-container {
-      height: 100%;
-      width: 100%;
-    }
     .source-input {
       text-align: left;
     }
@@ -278,85 +262,106 @@ function getHomePage(proxyBase) {
 </head>
 <body>
   <div class="container">
-   
-    <!-- Video.js player -->
-    <div class="video-container">
-      <video
-        id="my-player"
-        class="video-js vjs-big-play-centered vjs-playback-rate"
-        width="100%"
-        height="100%"
-        >
-        <source src="//vjs.zencdn.net/v/oceans.mp4" type="video/mp4"></source>
-        <source src="//vjs.zencdn.net/v/oceans.webm" type="video/webm"></source>
-        <source src="//vjs.zencdn.net/v/oceans.ogv" type="video/ogg"></source>
-        <p class="vjs-no-js">
-          To view this video please enable JavaScript, and consider upgrading to a
-          web browser that
-          <a href="https://videojs.com/html5-video-support/" target="_blank">
-            supports HTML5 video
-          </a>
-        </p>
-      </video>
-
-      <!-- Custom source input -->
-      <div class="source-input">
-        <div class="input-group">
-          <input type="text" id="videoUrlInput" placeholder="Enter Video URL to Proxy">
-          <button type="button" id="loadVideoBtn">Load Video</button>
-        </div>
+    <div class="player-container" id="playerContainer"></div>
+    <div class="source-input">
+      <div class="input-group">
+        <input type="text" id="videoUrlInput" placeholder="Enter Video URL to Proxy">
+        <button type="button" id="loadVideoBtn">Load Video</button>
       </div>
     </div>
-  </dive>
-  <!-- Video.js JavaScript -->
-  <script src="//vjs.zencdn.net/8.23.6/video.min.js"></script>
-  <!-- VHS (HTTP Streaming) plugin for HLS and DASH -->
-  <script src="//cdn.jsdelivr.net/npm/@videojs/http-streaming@3.13.0/dist/videojs-http-streaming.min.js"></script>
-  <script>
-    // Initialize Video.js player
-    var player = videojs('my-player', {
-      fluid: true,
-      responsive: true,
-      playbackRates: [0.5, 1, 1.5, 2],
-      controls: true,
-      preload: 'auto',
-      poster: 'https://gamefa.com/wp-content/uploads/2024/02/Star-Wars-Outlaws.jpg'
-    });
+  </div>
 
-    // Load custom video URL through the proxy
-    document.getElementById('loadVideoBtn').addEventListener('click', function() {
-      var url = document.getElementById('videoUrlInput').value.trim();
-      if (!url) {
-        alert('Please enter a video URL');
-        return;
-      }
-      // Ensure the URL has a protocol
+  <!-- Video.js 10 core (video-player + video-skin) -->
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.2.0/video.js"></script>
+  <!-- Live player (live-video-player + live-video-skin) -->
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.2.0/live-video.js"></script>
+  <!-- HLS media component (hlsjs-video) -->
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.2.0/media/hlsjs-video.js"></script>
+
+  <script type="module">
+    const playersReady = Promise.all([
+      customElements.whenDefined('video-player').catch(() => {}),
+      customElements.whenDefined('live-video-player').catch(() => {}),
+      customElements.whenDefined('hlsjs-video').catch(() => {}),
+    ]);
+
+    const DEFAULT_URL = 'https://stream.mux.com/BV3YZtogl89mg9VcNBhhnHm02Y34zI1nlMuMQfAbl3dM/highest.mp4';
+
+    function normalizeUrl(url) {
       if (!/^https?:\\/\\//i.test(url)) {
         if (url.startsWith('//')) url = 'https:' + url;
         else if (!url.includes('://')) url = 'https://' + url;
       }
+      return url;
+    }
 
-      // Build the proxied URL: current origin + '/' + original absolute URL
-      var proxiedUrl = window.location.origin + '/' + url;
+    function isHlsUrl(url) {
+      return /\\.m3u8(\\?|$)/i.test(url);
+    }
 
-      // Determine MIME type from original URL
-      var type = getTypeFromUrl(url);
+    function toProxiedUrl(url) {
+      return window.location.origin + '/' + url;
+    }
 
-      // Set source to the proxied URL and play
-      player.src({ src: proxiedUrl, type: type });
-      player.play();
+    function safePlay(el) {
+      const tryPlay = () => {
+        try {
+          const result = el.play && el.play();
+          if (result && typeof result.catch === 'function') result.catch(() => {});
+        } catch (e) {}
+      };
+      tryPlay();
+      setTimeout(tryPlay, 100);
+      setTimeout(tryPlay, 500);
+    }
+
+    async function buildPlayer(rawUrl) {
+      await playersReady;
+      const url = normalizeUrl(rawUrl);
+      const proxiedUrl = toProxiedUrl(url);
+      const container = document.getElementById('playerContainer');
+      container.innerHTML = '';
+
+      if (isHlsUrl(url)) {
+        // HLS (live or VOD) -> live player + hlsjs media
+        const player = document.createElement('live-video-player');
+        const skin = document.createElement('live-video-skin');
+        const media = document.createElement('hlsjs-video');
+        media.setAttribute('src', proxiedUrl);
+        media.setAttribute('playsinline', '');
+        skin.appendChild(media);
+        player.appendChild(skin);
+        container.appendChild(player);
+        safePlay(media);
+      } else {
+        // Plain video (mp4 / webm / ogv) -> video player + video media
+        const player = document.createElement('video-player');
+        const skin = document.createElement('video-skin');
+        const media = document.createElement('video');
+        media.setAttribute('src', proxiedUrl);
+        media.setAttribute('playsinline', '');
+        const fallback = document.createElement('a');
+        fallback.href = 'https://videojs.org/help';
+        fallback.textContent = 'Video player not working?';
+        media.appendChild(fallback);
+        skin.appendChild(media);
+        player.appendChild(skin);
+        container.appendChild(player);
+        safePlay(media);
+      }
+    }
+
+    document.getElementById('loadVideoBtn').addEventListener('click', function() {
+      const url = document.getElementById('videoUrlInput').value.trim();
+      if (!url) {
+        alert('Please enter a video URL');
+        return;
+      }
+      buildPlayer(url);
     });
 
-    // Helper to guess MIME type from URL
-    function getTypeFromUrl(url) {
-      const lower = url.toLowerCase();
-      if (lower.includes('.m3u8')) return 'application/x-mpegURL';
-      if (lower.includes('.mpd')) return 'application/dash+xml';
-      if (lower.includes('.mp4')) return 'video/mp4';
-      if (lower.includes('.webm')) return 'video/webm';
-      if (lower.includes('.ogv') || lower.includes('.ogg')) return 'video/ogg';
-      return undefined;
-    }
+    // Boot with a default stream
+    buildPlayer(DEFAULT_URL);
   </script>
 </body>
 </html>`, {
@@ -394,4 +399,4 @@ function getErrorPage(error, targetUrl) {
   <div class="details">Request URL: ${targetUrl}\nTime: ${new Date().toISOString()}</div>
 </body>
 </html>`;
-}
+                              }
