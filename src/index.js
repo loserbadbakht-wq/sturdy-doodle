@@ -256,7 +256,7 @@ function getHomePage(proxyBase) {
       margin-bottom: 20px;
     }
 
-    /* ---------- URL bar (desktop search form) ---------- */
+    /* ---------- URL bar (desktop search form, full width) ---------- */
     .search-row {
       margin-bottom: 24px;
     }
@@ -264,8 +264,8 @@ function getHomePage(proxyBase) {
       display: flex;
       align-items: center;
       gap: 8px;
+      width: 100%;
       height: 40px;
-      max-width: 640px;
       padding: 0 4px 0 16px;
       background: #121212;
       border: 1px solid #303030;
