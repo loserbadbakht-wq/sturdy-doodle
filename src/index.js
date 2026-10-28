@@ -184,86 +184,49 @@ async function handleRequest(request) {
 }
 
 // ============================
-// Landing Page (Player + title + URL bar only)
+// Landing Page (YouTube desktop style, player + title + URL bar only)
 // ============================
 function getHomePage(proxyBase) {
   return new Response(`<!DOCTYPE html>
-<html lang="en">
+<html lang="en" darker-dark-theme="" dark="" system-icons="" color-version="v2_0" typography="" typography-spacing="">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0f0f0f">
   <title>YouTube</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="//fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=YouTube+Sans:wght@300..900&display=swap">
   <style>
-    /* ============================================================
-       YouTube design tokens — trimmed subset actually used
-       ============================================================ */
-    html {
-      /* Baseline colors */
-      --yt-sys-color-baseline--base-background: #0f0f0f;
-      --yt-sys-color-baseline--text-primary: #f1f1f1;
-      --yt-sys-color-baseline--text-secondary: #aaa;
-      --yt-sys-color-baseline--text-disabled: #717171;
-      --yt-sys-color-baseline--outline: rgba(255,255,255,0.2);
-      --yt-sys-color-baseline--outline-opaque: #3f3f3f;
-      --yt-sys-color-baseline--call-to-action: #3ea6ff;
-      --yt-sys-color-baseline--call-to-action-inverse: #065fd4;
-      --yt-sys-color-baseline--tonal-background: rgba(255,255,255,0.1);
-      --yt-sys-color-baseline--button-chip-background-hover: rgba(255,255,255,0.2);
-
-      /* Searchbox */
-      --ytd-searchbox-background: hsl(0,0%,7%);
-      --ytd-searchbox-text-color: hsla(0,100%,100%,0.88);
-      --ytd-searchbox-border-color: hsla(0,0%,53.3%,0.4);
-
-      /* Typography */
-      --yt-ref-typography-values--font-family: Roboto,Arial,sans-serif;
-      --yt-ref-typography-values--body-s-size: 1.2rem;
-      --yt-ref-typography-values--body-m-size: 1.4rem;
-      --yt-ref-typography-values--body-l-size: 1.6rem;
-      --yt-ref-typography-values--title-l-size: 2.2rem;
-      --yt-ref-typography-values--weight-medium: 500;
-      --yt-ref-typography-values--weight-bold: 700;
-
-      /* Dimensions */
-      --yt-ref-dimension--size4: 4px;
-      --yt-ref-dimension--size6: 6px;
-      --yt-ref-dimension--size8: 8px;
-      --yt-ref-dimension--size12: 12px;
-      --yt-ref-dimension--size16: 16px;
-      --yt-ref-dimension--size20: 20px;
-      --yt-ref-dimension--size24: 24px;
-      --yt-ref-dimension--size32: 32px;
-      --yt-ref-dimension--size40: 40px;
-
-      /* Desktop (PC) grid */
-      --ytd-grid-max-width: 1284px;
-      --ytd-grid-gutter-margin: 16px;
-
-      /* Base */
-      font-size: 62.5%;
-      font-family: var(--yt-ref-typography-values--font-family);
-      background-color: var(--yt-sys-color-baseline--base-background);
-      color: var(--yt-sys-color-baseline--text-primary);
-    }
-
     *, *::before, *::after { box-sizing: border-box; }
+    html { background: #0f0f0f; }
     html, body { margin: 0; padding: 0; }
     body {
-      background: var(--yt-sys-color-baseline--base-background);
-      color: var(--yt-sys-color-baseline--text-primary);
-      font-family: var(--yt-ref-typography-values--font-family);
+      background: #0f0f0f;
+      color: #f1f1f1;
+      font-family: "Roboto", "YouTube Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
-      -webkit-tap-highlight-color: transparent;
-      padding-bottom: var(--yt-ref-dimension--size24);
+      font-size: 14px;
+      line-height: 1.4;
     }
 
-    /* ---------- Shell (mobile-first) ---------- */
-    .shell { max-width: 480px; margin: 0 auto; }
+    /* ---------- Page shell (YouTube desktop watch layout) ---------- */
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px 24px 48px;
+    }
+    @media (min-width: 1600px) {
+      .page { max-width: 1440px; }
+    }
 
     /* ---------- Player ---------- */
     .player-wrap {
-      width: 100%; aspect-ratio: 16 / 9; background: #000; position: relative;
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
     }
     #playerContainer,
     #playerContainer > *,
@@ -276,106 +239,74 @@ function getHomePage(proxyBase) {
 
     /* ---------- Video meta ---------- */
     .video-title {
-      margin: var(--yt-ref-dimension--size12) var(--yt-ref-dimension--size12) var(--yt-ref-dimension--size4);
-      font-size: var(--yt-ref-typography-values--body-l-size);
-      font-weight: var(--yt-ref-typography-values--weight-bold);
+      margin: 16px 0 4px;
+      font-family: "YouTube Sans", "Roboto", sans-serif;
+      font-size: 20px;
+      font-weight: 700;
       line-height: 1.3;
+      color: #f1f1f1;
       word-break: break-word;
     }
+    @media (min-width: 1000px) {
+      .video-title { font-size: 22px; }
+    }
     .meta-line {
-      padding: 0 var(--yt-ref-dimension--size12);
-      font-size: var(--yt-ref-typography-values--body-s-size);
-      color: var(--yt-sys-color-baseline--text-secondary);
-      margin-bottom: var(--yt-ref-dimension--size12);
+      font-size: 14px;
+      color: #aaa;
+      margin-bottom: 20px;
     }
 
-    /* ---------- Search row (under video name) ---------- */
+    /* ---------- URL bar (desktop search form) ---------- */
     .search-row {
-      padding: 0 var(--yt-ref-dimension--size12) 14px;
+      margin-bottom: 24px;
     }
     .search-form {
-      display: flex; align-items: center;
-      gap: var(--yt-ref-dimension--size6);
-      height: var(--yt-ref-dimension--size40);
-      padding: 0 var(--yt-ref-dimension--size4) 0 14px;
-      background: var(--ytd-searchbox-background);
-      border: 1px solid var(--ytd-searchbox-border-color);
-      border-radius: var(--yt-ref-dimension--size20);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 40px;
+      max-width: 640px;
+      padding: 0 4px 0 16px;
+      background: #121212;
+      border: 1px solid #303030;
+      border-radius: 20px;
+      transition: border-color 0.15s ease;
     }
-    .search-form:focus-within {
-      border-color: var(--yt-sys-color-baseline--call-to-action-inverse);
-    }
+    .search-form:focus-within { border-color: #1c62b9; }
     .search-form input {
-      flex: 1; min-width: 0; height: 100%;
-      background: transparent; border: 0; outline: 0;
-      color: var(--yt-sys-color-baseline--text-primary);
-      font-size: var(--yt-ref-typography-values--body-m-size);
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      color: #f1f1f1;
       font-family: inherit;
+      font-size: 15px;
+      padding: 0;
     }
-    .search-form input::placeholder {
-      color: var(--yt-sys-color-baseline--text-secondary);
-    }
+    .search-form input::placeholder { color: #888; }
     .search-form button {
-      width: var(--yt-ref-dimension--size32);
-      height: var(--yt-ref-dimension--size32);
       flex: 0 0 auto;
-      display: inline-flex; align-items: center; justify-content: center;
-      border: 0; border-radius: 50%;
-      background: var(--yt-sys-color-baseline--tonal-background);
-      color: var(--yt-sys-color-baseline--text-primary);
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 50%;
+      background: #272727;
+      color: #f1f1f1;
       cursor: pointer;
+      transition: background 0.15s ease;
     }
-    .search-form button:active {
-      background: var(--yt-sys-color-baseline--button-chip-background-hover);
-    }
-    .search-form button svg {
-      width: var(--yt-ref-dimension--size20);
-      height: var(--yt-ref-dimension--size20);
-    }
-
-    /* ============================================================
-       Desktop (PC) layout — 1000px and up
-       ============================================================ */
-    @media (min-width: 1000px) {
-      body { padding-bottom: var(--ytd-grid-gutter-margin); }
-      .shell {
-        max-width: var(--ytd-grid-max-width);
-        padding: var(--ytd-grid-gutter-margin);
-      }
-      main {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
-        column-gap: var(--ytd-grid-gutter-margin);
-        align-items: start;
-      }
-      .player-wrap {
-        grid-column: 1;
-        grid-row: 1 / span 3;
-        border-radius: var(--yt-ref-dimension--size12);
-        overflow: hidden;
-      }
-      .video-title {
-        grid-column: 2;
-        grid-row: 1;
-        margin: 0 0 var(--yt-ref-dimension--size4);
-        font-size: var(--yt-ref-typography-values--title-l-size);
-      }
-      .meta-line {
-        grid-column: 2;
-        grid-row: 2;
-        padding: 0;
-        margin-bottom: var(--yt-ref-dimension--size16);
-      }
-      .search-row {
-        grid-column: 2;
-        grid-row: 3;
-        padding: 0;
-      }
-    }
+    .search-form button:hover { background: #3f3f3f; }
+    .search-form button:active { background: #4d4d4d; }
+    .search-form button svg { width: 18px; height: 18px; display: block; }
   </style>
 </head>
 <body>
-  <div class="shell">
+  <div class="page">
     <main>
       <!-- Video.js 10 player mounts here -->
       <div class="player-wrap">
@@ -385,14 +316,14 @@ function getHomePage(proxyBase) {
       <h1 class="video-title" id="videoTitle">Loading…</h1>
       <div class="meta-line" id="metaLine">Proxied stream</div>
 
-      <!-- URL bar (under video name on mobile, beside player on desktop) -->
+      <!-- URL bar (under video name) -->
       <div class="search-row">
         <form class="search-form" id="searchForm" autocomplete="off">
           <input type="text" id="videoUrlInput" placeholder="Paste a video or .m3u8 URL" spellcheck="false">
           <button type="submit" aria-label="Load">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
               <circle cx="11" cy="11" r="7"/>
-              <path d="m20 20-3.5-3.5" stroke-linecap="round"/>
+              <path d="m20 20-3.5-3.5"/>
             </svg>
           </button>
         </form>
@@ -416,124 +347,6 @@ function getHomePage(proxyBase) {
 
     var DEFAULT_URL = 'https://stream.mux.com/BV3YZtogl89mg9VcNBhhnHm02Y34zI1nlMuMQfAbl3dM/highest.mp4';
 
-    // ---------- Name decoding helpers ----------
-
-    var KNOWN_HOSTS = [
-      { match: /(^|\\.)ttvnw\\.net$/i,         name: 'Twitch stream' },
-      { match: /(^|\\.)twitch\\.tv$/i,         name: 'Twitch stream' },
-      { match: /(^|\\.)mux\\.com$/i,           name: 'Mux stream' },
-      { match: /(^|\\.)googlevideo\\.com$/i,   name: 'YouTube video' },
-      { match: /(^|\\.)youtube\\.com$/i,       name: 'YouTube video' },
-      { match: /(^|\\.)cloudfront\\.net$/i,    name: 'CloudFront stream' },
-      { match: /(^|\\.)akamaihd\\.net$/i,      name: 'Akamai stream' },
-      { match: /(^|\\.)akamai\\.net$/i,        name: 'Akamai stream' },
-      { match: /(^|\\.)fastly\\.net$/i,        name: 'Fastly stream' },
-      { match: /(^|\\.)bunnycdn\\.com$/i,      name: 'Bunny stream' }
-    ];
-    var HOST_PREFIX_BLACKLIST = ['www', 'api', 'cdn', 'static', 'media', 'playlist', 'live', 'edge'];
-
-    function safeDecode(s) {
-      try { return decodeURIComponent(s); } catch (e) { return s; }
-    }
-
-    function isOpaqueToken(s) {
-      if (!s || s.length < 32) return false;
-      if (/^[A-Za-z0-9_-]{32,}$/.test(s)) return true;
-      if (/^[0-9a-f]{32,}$/i.test(s)) return true;
-      return false;
-    }
-
-    function tryDecodeToken(token) {
-      if (!token || token.length < 32) return '';
-      if (!/^[A-Za-z0-9_-]+$/.test(token)) return '';
-      try {
-        var b64 = token.replace(/-/g, '+').replace(/_/g, '/');
-        while (b64.length % 4) b64 += '=';
-        var bin = atob(b64);
-        if (!bin.length) return '';
-        var printable = 0;
-        var runs = [];
-        var cur = '';
-        for (var i = 0; i < bin.length; i++) {
-          var c = bin.charCodeAt(i);
-          if (c >= 32 && c < 127) {
-            printable++;
-            cur += bin.charAt(i);
-          } else {
-            if (cur.length >= 4) runs.push(cur);
-            cur = '';
-          }
-        }
-        if (cur.length >= 4) runs.push(cur);
-        if (!printable || printable / bin.length < 0.6) return '';
-        runs.sort(function (a, b) { return b.length - a.length; });
-        var best = runs[0];
-        if (!best) return '';
-        best = best.replace(/[^A-Za-z0-9 ._\\-]+/g, ' ').replace(/\\s+/g, ' ').trim();
-        if (best.length < 3) return '';
-        if (best.length > 60) best = best.slice(0, 57) + '…';
-        return best;
-      } catch (e) {
-        return '';
-      }
-    }
-
-    function titleForUrl(url) {
-      try {
-        var u = new URL(url);
-        var host = u.hostname.toLowerCase();
-
-        for (var i = 0; i < KNOWN_HOSTS.length; i++) {
-          if (KNOWN_HOSTS[i].match.test(host)) {
-            var sub = host.split('.')[0];
-            var rm = sub.match(/^([a-z]{2,5})(\\d+)?$/i);
-            var label = KNOWN_HOSTS[i].name;
-            if (rm && HOST_PREFIX_BLACKLIST.indexOf(rm[1].toLowerCase()) === -1) {
-              return label + ' · ' + rm[1].toUpperCase();
-            }
-            return label;
-          }
-        }
-
-        var parts = u.pathname.split('/').filter(Boolean);
-        var lastSeg = '';
-        if (parts.length) {
-          lastSeg = safeDecode(parts[parts.length - 1]).replace(/\\.[a-z0-9]{1,6}$/i, '');
-        }
-
-        if (isOpaqueToken(lastSeg)) {
-          var decoded = tryDecodeToken(lastSeg);
-          if (decoded) return decoded;
-
-          for (var j = parts.length - 2; j >= 0; j--) {
-            var seg = safeDecode(parts[j]).replace(/\\.[a-z0-9]{1,6}$/i, '');
-            if (seg && !isOpaqueToken(seg)) {
-              return seg + ' stream';
-            }
-          }
-
-          var cleanHost = host.replace(/^(www|playlist|cdn|media|static|api|live|edge)\\./i, '');
-          return cleanHost + ' stream';
-        }
-
-        if (lastSeg) return lastSeg;
-
-        for (var k = 0; k < parts.length; k++) {
-          var s = safeDecode(parts[k]).replace(/\\.[a-z0-9]{1,6}$/i, '');
-          if (s && !isOpaqueToken(s)) return s + ' stream';
-        }
-
-        var cleanHost2 = host.replace(/^(www|playlist|cdn|media|static|api|live|edge)\\./i, '');
-        return cleanHost2 + ' stream';
-      } catch (e) {
-        return 'Video';
-      }
-    }
-
-    function hostForUrl(url) {
-      try { return new URL(url).hostname; } catch (e) { return 'proxied stream'; }
-    }
-
     function normalizeUrl(url) {
       if (!/^https?:\\/\\//i.test(url)) {
         if (url.indexOf('//') === 0) url = 'https:' + url;
@@ -548,6 +361,22 @@ function getHomePage(proxyBase) {
 
     function toProxiedUrl(url) {
       return window.location.origin + '/' + url;
+    }
+
+    function titleForUrl(url) {
+      try {
+        var u = new URL(url);
+        var parts = u.pathname.split('/').filter(Boolean);
+        var name = parts.length ? parts[parts.length - 1] : u.hostname;
+        name = decodeURIComponent(name).replace(/\\.[a-z0-9]+$/i, '');
+        return name || u.hostname;
+      } catch (e) {
+        return 'Video';
+      }
+    }
+
+    function hostForUrl(url) {
+      try { return new URL(url).hostname; } catch (e) { return 'proxied stream'; }
     }
 
     function safePlay(el) {
@@ -571,6 +400,7 @@ function getHomePage(proxyBase) {
       container.innerHTML = '';
 
       if (isHlsUrl(url)) {
+        // HLS (live or VOD) -> live player + hlsjs media
         var player = document.createElement('live-video-player');
         var skin = document.createElement('live-video-skin');
         var media = document.createElement('hlsjs-video');
@@ -581,6 +411,7 @@ function getHomePage(proxyBase) {
         container.appendChild(player);
         safePlay(media);
       } else {
+        // Plain video (mp4 / webm / ogv) -> video player + video media
         var player2 = document.createElement('video-player');
         var skin2 = document.createElement('video-skin');
         var media2 = document.createElement('video');
@@ -596,11 +427,10 @@ function getHomePage(proxyBase) {
         safePlay(media2);
       }
 
-      var niceTitle = titleForUrl(url);
-      document.getElementById('videoTitle').textContent = niceTitle;
+      document.getElementById('videoTitle').textContent = titleForUrl(url);
       document.getElementById('metaLine').textContent = hostForUrl(url) + ' · proxied';
       document.getElementById('videoUrlInput').value = url;
-      document.title = niceTitle + ' - YouTube';
+      document.title = titleForUrl(url) + ' - YouTube';
     }
 
     document.getElementById('searchForm').addEventListener('submit', function (e) {
@@ -610,6 +440,7 @@ function getHomePage(proxyBase) {
       buildPlayer(v);
     });
 
+    // Boot with a default stream
     buildPlayer(DEFAULT_URL);
   </script>
 </body>
