@@ -195,16 +195,70 @@ function getHomePage(proxyBase) {
   <meta name="theme-color" content="#0f0f0f">
   <title>YouTube</title>
   <style>
+    /* ============================================================
+       YouTube design tokens — trimmed subset actually used
+       ============================================================ */
+    html {
+      /* Baseline colors */
+      --yt-sys-color-baseline--base-background: #0f0f0f;
+      --yt-sys-color-baseline--text-primary: #f1f1f1;
+      --yt-sys-color-baseline--text-secondary: #aaa;
+      --yt-sys-color-baseline--text-disabled: #717171;
+      --yt-sys-color-baseline--outline: rgba(255,255,255,0.2);
+      --yt-sys-color-baseline--outline-opaque: #3f3f3f;
+      --yt-sys-color-baseline--call-to-action: #3ea6ff;
+      --yt-sys-color-baseline--call-to-action-inverse: #065fd4;
+      --yt-sys-color-baseline--tonal-background: rgba(255,255,255,0.1);
+      --yt-sys-color-baseline--button-chip-background-hover: rgba(255,255,255,0.2);
+
+      /* Searchbox */
+      --ytd-searchbox-background: hsl(0,0%,7%);
+      --ytd-searchbox-text-color: hsla(0,100%,100%,0.88);
+      --ytd-searchbox-border-color: hsla(0,0%,53.3%,0.4);
+
+      /* Typography */
+      --yt-ref-typography-values--font-family: Roboto,Arial,sans-serif;
+      --yt-ref-typography-values--body-s-size: 1.2rem;
+      --yt-ref-typography-values--body-m-size: 1.4rem;
+      --yt-ref-typography-values--body-l-size: 1.6rem;
+      --yt-ref-typography-values--title-l-size: 2.2rem;
+      --yt-ref-typography-values--weight-medium: 500;
+      --yt-ref-typography-values--weight-bold: 700;
+
+      /* Dimensions */
+      --yt-ref-dimension--size4: 4px;
+      --yt-ref-dimension--size6: 6px;
+      --yt-ref-dimension--size8: 8px;
+      --yt-ref-dimension--size12: 12px;
+      --yt-ref-dimension--size16: 16px;
+      --yt-ref-dimension--size20: 20px;
+      --yt-ref-dimension--size24: 24px;
+      --yt-ref-dimension--size32: 32px;
+      --yt-ref-dimension--size40: 40px;
+
+      /* Desktop (PC) grid */
+      --ytd-grid-max-width: 1284px;
+      --ytd-grid-gutter-margin: 16px;
+
+      /* Base */
+      font-size: 62.5%;
+      font-family: var(--yt-ref-typography-values--font-family);
+      background-color: var(--yt-sys-color-baseline--base-background);
+      color: var(--yt-sys-color-baseline--text-primary);
+    }
+
     *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     body {
-      background: #0f0f0f;
-      color: #f1f1f1;
-      font-family: Roboto, "YouTube Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background: var(--yt-sys-color-baseline--base-background);
+      color: var(--yt-sys-color-baseline--text-primary);
+      font-family: var(--yt-ref-typography-values--font-family);
       -webkit-font-smoothing: antialiased;
       -webkit-tap-highlight-color: transparent;
-      padding-bottom: 24px;
+      padding-bottom: var(--yt-ref-dimension--size24);
     }
+
+    /* ---------- Shell (mobile-first) ---------- */
     .shell { max-width: 480px; margin: 0 auto; }
 
     /* ---------- Player ---------- */
@@ -222,35 +276,102 @@ function getHomePage(proxyBase) {
 
     /* ---------- Video meta ---------- */
     .video-title {
-      margin: 12px 12px 4px; font-size: 16px; font-weight: 700;
-      line-height: 1.3; word-break: break-word;
+      margin: var(--yt-ref-dimension--size12) var(--yt-ref-dimension--size12) var(--yt-ref-dimension--size4);
+      font-size: var(--yt-ref-typography-values--body-l-size);
+      font-weight: var(--yt-ref-typography-values--weight-bold);
+      line-height: 1.3;
+      word-break: break-word;
     }
-    .meta-line { padding: 0 12px; font-size: 12px; color: #aaa; margin-bottom: 12px; }
+    .meta-line {
+      padding: 0 var(--yt-ref-dimension--size12);
+      font-size: var(--yt-ref-typography-values--body-s-size);
+      color: var(--yt-sys-color-baseline--text-secondary);
+      margin-bottom: var(--yt-ref-dimension--size12);
+    }
 
     /* ---------- Search row (under video name) ---------- */
     .search-row {
-      padding: 0 12px 14px;
+      padding: 0 var(--yt-ref-dimension--size12) 14px;
     }
     .search-form {
-      display: flex; align-items: center; gap: 6px;
-      height: 40px; padding: 0 4px 0 14px;
-      background: #121212; border: 1px solid #303030; border-radius: 20px;
+      display: flex; align-items: center;
+      gap: var(--yt-ref-dimension--size6);
+      height: var(--yt-ref-dimension--size40);
+      padding: 0 var(--yt-ref-dimension--size4) 0 14px;
+      background: var(--ytd-searchbox-background);
+      border: 1px solid var(--ytd-searchbox-border-color);
+      border-radius: var(--yt-ref-dimension--size20);
     }
-    .search-form:focus-within { border-color: #1c62b9; }
+    .search-form:focus-within {
+      border-color: var(--yt-sys-color-baseline--call-to-action-inverse);
+    }
     .search-form input {
       flex: 1; min-width: 0; height: 100%;
       background: transparent; border: 0; outline: 0;
-      color: #f1f1f1; font-size: 14px; font-family: inherit;
+      color: var(--yt-sys-color-baseline--text-primary);
+      font-size: var(--yt-ref-typography-values--body-m-size);
+      font-family: inherit;
     }
-    .search-form input::placeholder { color: #888; }
+    .search-form input::placeholder {
+      color: var(--yt-sys-color-baseline--text-secondary);
+    }
     .search-form button {
-      width: 32px; height: 32px; flex: 0 0 auto;
+      width: var(--yt-ref-dimension--size32);
+      height: var(--yt-ref-dimension--size32);
+      flex: 0 0 auto;
       display: inline-flex; align-items: center; justify-content: center;
-      border: 0; border-radius: 50%; background: #272727;
-      color: #f1f1f1; cursor: pointer;
+      border: 0; border-radius: 50%;
+      background: var(--yt-sys-color-baseline--tonal-background);
+      color: var(--yt-sys-color-baseline--text-primary);
+      cursor: pointer;
     }
-    .search-form button:active { background: #3f3f3f; }
-    .search-form button svg { width: 18px; height: 18px; }
+    .search-form button:active {
+      background: var(--yt-sys-color-baseline--button-chip-background-hover);
+    }
+    .search-form button svg {
+      width: var(--yt-ref-dimension--size20);
+      height: var(--yt-ref-dimension--size20);
+    }
+
+    /* ============================================================
+       Desktop (PC) layout — 1000px and up
+       ============================================================ */
+    @media (min-width: 1000px) {
+      body { padding-bottom: var(--ytd-grid-gutter-margin); }
+      .shell {
+        max-width: var(--ytd-grid-max-width);
+        padding: var(--ytd-grid-gutter-margin);
+      }
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+        column-gap: var(--ytd-grid-gutter-margin);
+        align-items: start;
+      }
+      .player-wrap {
+        grid-column: 1;
+        grid-row: 1 / span 3;
+        border-radius: var(--yt-ref-dimension--size12);
+        overflow: hidden;
+      }
+      .video-title {
+        grid-column: 2;
+        grid-row: 1;
+        margin: 0 0 var(--yt-ref-dimension--size4);
+        font-size: var(--yt-ref-typography-values--title-l-size);
+      }
+      .meta-line {
+        grid-column: 2;
+        grid-row: 2;
+        padding: 0;
+        margin-bottom: var(--yt-ref-dimension--size16);
+      }
+      .search-row {
+        grid-column: 2;
+        grid-row: 3;
+        padding: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -264,7 +385,7 @@ function getHomePage(proxyBase) {
       <h1 class="video-title" id="videoTitle">Loading…</h1>
       <div class="meta-line" id="metaLine">Proxied stream</div>
 
-      <!-- URL bar (under video name) -->
+      <!-- URL bar (under video name on mobile, beside player on desktop) -->
       <div class="search-row">
         <form class="search-form" id="searchForm" autocomplete="off">
           <input type="text" id="videoUrlInput" placeholder="Paste a video or .m3u8 URL" spellcheck="false">
@@ -297,7 +418,6 @@ function getHomePage(proxyBase) {
 
     // ---------- Name decoding helpers ----------
 
-    // Known CDN / streaming hosts → friendly labels
     var KNOWN_HOSTS = [
       { match: /(^|\\.)ttvnw\\.net$/i,         name: 'Twitch stream' },
       { match: /(^|\\.)twitch\\.tv$/i,         name: 'Twitch stream' },
@@ -316,7 +436,6 @@ function getHomePage(proxyBase) {
       try { return decodeURIComponent(s); } catch (e) { return s; }
     }
 
-    // An opaque token: long base64url or hex blob (Twitch tokens, signed URLs, etc.)
     function isOpaqueToken(s) {
       if (!s || s.length < 32) return false;
       if (/^[A-Za-z0-9_-]{32,}$/.test(s)) return true;
@@ -324,7 +443,6 @@ function getHomePage(proxyBase) {
       return false;
     }
 
-    // Try to extract readable text from a base64url token.
     function tryDecodeToken(token) {
       if (!token || token.length < 32) return '';
       if (!/^[A-Za-z0-9_-]+$/.test(token)) return '';
@@ -365,7 +483,6 @@ function getHomePage(proxyBase) {
         var u = new URL(url);
         var host = u.hostname.toLowerCase();
 
-        // 1) Known provider?
         for (var i = 0; i < KNOWN_HOSTS.length; i++) {
           if (KNOWN_HOSTS[i].match.test(host)) {
             var sub = host.split('.')[0];
@@ -384,12 +501,10 @@ function getHomePage(proxyBase) {
           lastSeg = safeDecode(parts[parts.length - 1]).replace(/\\.[a-z0-9]{1,6}$/i, '');
         }
 
-        // 2) Opaque token in the filename? Decode or fall back.
         if (isOpaqueToken(lastSeg)) {
           var decoded = tryDecodeToken(lastSeg);
           if (decoded) return decoded;
 
-          // Walk back through path segments for a meaningful folder name
           for (var j = parts.length - 2; j >= 0; j--) {
             var seg = safeDecode(parts[j]).replace(/\\.[a-z0-9]{1,6}$/i, '');
             if (seg && !isOpaqueToken(seg)) {
@@ -397,21 +512,17 @@ function getHomePage(proxyBase) {
             }
           }
 
-          // Fall back to a cleaned-up hostname
           var cleanHost = host.replace(/^(www|playlist|cdn|media|static|api|live|edge)\\./i, '');
           return cleanHost + ' stream';
         }
 
-        // 3) Normal filename
         if (lastSeg) return lastSeg;
 
-        // 4) Use the first meaningful path segment
         for (var k = 0; k < parts.length; k++) {
           var s = safeDecode(parts[k]).replace(/\\.[a-z0-9]{1,6}$/i, '');
           if (s && !isOpaqueToken(s)) return s + ' stream';
         }
 
-        // 5) Last resort
         var cleanHost2 = host.replace(/^(www|playlist|cdn|media|static|api|live|edge)\\./i, '');
         return cleanHost2 + ' stream';
       } catch (e) {
@@ -460,7 +571,6 @@ function getHomePage(proxyBase) {
       container.innerHTML = '';
 
       if (isHlsUrl(url)) {
-        // HLS (live or VOD) -> live player + hlsjs media
         var player = document.createElement('live-video-player');
         var skin = document.createElement('live-video-skin');
         var media = document.createElement('hlsjs-video');
@@ -471,7 +581,6 @@ function getHomePage(proxyBase) {
         container.appendChild(player);
         safePlay(media);
       } else {
-        // Plain video (mp4 / webm / ogv) -> video player + video media
         var player2 = document.createElement('video-player');
         var skin2 = document.createElement('video-skin');
         var media2 = document.createElement('video');
@@ -501,7 +610,6 @@ function getHomePage(proxyBase) {
       buildPlayer(v);
     });
 
-    // Boot with a default stream
     buildPlayer(DEFAULT_URL);
   </script>
 </body>
@@ -540,4 +648,4 @@ function getErrorPage(error, targetUrl) {
   <div class="details">Request URL: ${targetUrl}\nTime: ${new Date().toISOString()}</div>
 </body>
 </html>`;
-    }
+}
