@@ -207,38 +207,29 @@ function getHomePage(proxyBase) {
     }
     .shell { max-width: 480px; margin: 0 auto; }
 
-    /* ---------- App bar ---------- */
-    .app-bar {
-      position: sticky; top: 0; z-index: 50;
-      display: flex; align-items: center; gap: 2px;
-      height: 48px; padding: 0 4px 0 4px;
-      background: #0f0f0f;
+    /* ---------- Player ---------- */
+    .player-wrap {
+      width: 100%; aspect-ratio: 16 / 9; background: #000; position: relative;
     }
-    .icon-btn {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%;
-      background: transparent; color: #f1f1f1; cursor: pointer; flex: 0 0 auto;
-    }
-    .icon-btn:active { background: #272727; }
-    .icon-btn svg { width: 24px; height: 24px; display: block; }
-    .logo {
-      display: flex; align-items: center; gap: 5px; text-decoration: none;
-      color: #fff; margin-right: auto; padding-left: 2px; min-width: 0;
-    }
-    .logo svg { width: 28px; height: 20px; display: block; flex: 0 0 auto; }
-    .logo span { font-size: 18px; font-weight: 700; letter-spacing: -0.6px; }
-    .avatar {
-      width: 30px; height: 30px; border-radius: 50%;
-      background: linear-gradient(135deg, #ff3d3d, #ff8a00);
-      color: #fff; font-size: 14px; font-weight: 700;
-      display: flex; align-items: center; justify-content: center;
-      margin: 0 6px; flex: 0 0 auto;
+    #playerContainer,
+    #playerContainer > *,
+    #playerContainer video-player,
+    #playerContainer live-video-player,
+    #playerContainer video-skin,
+    #playerContainer live-video-skin {
+      display: block; width: 100%; height: 100%;
     }
 
-    /* ---------- Search row ---------- */
+    /* ---------- Video meta ---------- */
+    .video-title {
+      margin: 12px 12px 4px; font-size: 16px; font-weight: 700;
+      line-height: 1.3; word-break: break-word;
+    }
+    .meta-line { padding: 0 12px; font-size: 12px; color: #aaa; margin-bottom: 12px; }
+
+    /* ---------- Search row (under video name) ---------- */
     .search-row {
-      position: sticky; top: 48px; z-index: 49;
-      padding: 2px 12px 10px; background: #0f0f0f;
+      padding: 0 12px 14px;
     }
     .search-form {
       display: flex; align-items: center; gap: 6px;
@@ -261,75 +252,10 @@ function getHomePage(proxyBase) {
     .search-form button:active { background: #3f3f3f; }
     .search-form button svg { width: 18px; height: 18px; }
 
-    /* ---------- Player ---------- */
-    .player-wrap {
-      width: 100%; aspect-ratio: 16 / 9; background: #000; position: relative;
-    }
-    #playerContainer,
-    #playerContainer > *,
-    #playerContainer video-player,
-    #playerContainer live-video-player,
-    #playerContainer video-skin,
-    #playerContainer live-video-skin {
-      display: block; width: 100%; height: 100%;
-    }
-
-    /* ---------- Video meta ---------- */
-    .video-title {
-      margin: 12px 12px 4px; font-size: 16px; font-weight: 700;
-      line-height: 1.3; word-break: break-word;
-    }
-    .meta-line { padding: 0 12px; font-size: 12px; color: #aaa; margin-bottom: 12px; }
-
-    /* ---------- Channel row ---------- */
-    .channel-row { display: flex; align-items: center; gap: 12px; padding: 0 12px 12px; }
-    .channel-avatar {
-      width: 36px; height: 36px; border-radius: 50%; flex: 0 0 auto;
-      background: linear-gradient(135deg, #ff3d3d, #ff8a00);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px; font-weight: 700; color: #fff;
-    }
-    .channel-info { flex: 1; min-width: 0; }
-    .channel-name {
-      font-size: 14px; font-weight: 500;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
+    /* ---------- Channel name ---------- */
+    .channel-name-row { padding: 0 12px 12px; }
+    .channel-name { font-size: 14px; font-weight: 500; color: #f1f1f1; }
     .channel-subs { font-size: 12px; color: #aaa; }
-    .subscribe-btn {
-      flex: 0 0 auto; height: 36px; padding: 0 16px;
-      border: 0; border-radius: 18px; background: #f1f1f1; color: #0f0f0f;
-      font-size: 14px; font-weight: 500; font-family: inherit; cursor: pointer;
-    }
-    .subscribe-btn:active { background: #d9d9d9; }
-
-    /* ---------- Action chips ---------- */
-    .chip-row {
-      display: flex; align-items: center; gap: 8px;
-      padding: 0 12px 12px; overflow-x: auto; scrollbar-width: none;
-    }
-    .chip-row::-webkit-scrollbar { display: none; }
-    .chip {
-      display: inline-flex; align-items: center; gap: 6px;
-      height: 36px; padding: 0 14px; flex: 0 0 auto;
-      border: 0; border-radius: 18px; background: #272727; color: #f1f1f1;
-      font-size: 14px; font-weight: 500; font-family: inherit;
-      white-space: nowrap; cursor: pointer;
-    }
-    .chip:active { background: #3f3f3f; }
-    .chip svg { width: 18px; height: 18px; fill: currentColor; display: block; }
-    .like-group {
-      display: inline-flex; align-items: center; flex: 0 0 auto;
-      height: 36px; border-radius: 18px; background: #272727;
-    }
-    .like-group button {
-      display: inline-flex; align-items: center; gap: 6px;
-      height: 36px; padding: 0 14px; border: 0; background: transparent;
-      color: #f1f1f1; font-size: 14px; font-weight: 500;
-      font-family: inherit; cursor: pointer;
-    }
-    .like-group svg { width: 18px; height: 18px; fill: currentColor; display: block; }
-    .like-group .divider { width: 1px; height: 20px; background: #4d4d4d; }
-    .like-group button.liked { color: #3ea6ff; }
 
     /* ---------- Description ---------- */
     .description {
@@ -366,47 +292,6 @@ function getHomePage(proxyBase) {
 </head>
 <body>
   <div class="shell">
-
-    <!-- App bar -->
-    <header class="app-bar">
-      <button class="icon-btn" type="button" aria-label="Menu">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M3 6h18M3 12h18M3 18h18"/>
-        </svg>
-      </button>
-      <a class="logo" href="/" aria-label="YouTube">
-        <svg viewBox="0 0 28 20" aria-hidden="true">
-          <path fill="#ff0000" d="M27.4 3.1A3.5 3.5 0 0 0 25 .6C22.8 0 14 0 14 0S5.2 0 3 .6A3.5 3.5 0 0 0 .6 3.1 36.7 36.7 0 0 0 0 10a36.7 36.7 0 0 0 .6 6.9A3.5 3.5 0 0 0 3 19.4C5.2 20 14 20 14 20s8.8 0 11-.6a3.5 3.5 0 0 0 2.4-2.5 36.7 36.7 0 0 0 .6-6.9 36.7 36.7 0 0 0-.6-6.9z"/>
-          <path fill="#fff" d="M11.2 14.3 18.4 10l-7.2-4.3z"/>
-        </svg>
-        <span>YouTube</span>
-      </a>
-      <button class="icon-btn" type="button" aria-label="Cast">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M1 18v3h3a3 3 0 0 0-3-3zm0-4v2a5 5 0 0 1 5 5h2a7 7 0 0 0-7-7zm0-4v2a9 9 0 0 1 9 9h2A11 11 0 0 0 1 10zm20-7H3a2 2 0 0 0-2 2v3h2V5h18v14h-7v2h7a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/>
-        </svg>
-      </button>
-      <button class="icon-btn" type="button" aria-label="Notifications">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6v-5a6 6 0 0 0-4.5-5.8V4.5a1.5 1.5 0 0 0-3 0v.7A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2z"/>
-        </svg>
-      </button>
-      <div class="avatar" aria-hidden="true">M</div>
-    </header>
-
-    <!-- Search / URL bar -->
-    <div class="search-row">
-      <form class="search-form" id="searchForm" autocomplete="off">
-        <input type="text" id="videoUrlInput" placeholder="Paste a video or .m3u8 URL" spellcheck="false">
-        <button type="submit" aria-label="Load">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="7"/>
-            <path d="m20 20-3.5-3.5" stroke-linecap="round"/>
-          </svg>
-        </button>
-      </form>
-    </div>
-
     <main>
       <!-- Video.js 10 player mounts here -->
       <div class="player-wrap">
@@ -416,43 +301,27 @@ function getHomePage(proxyBase) {
       <h1 class="video-title" id="videoTitle">Loading…</h1>
       <div class="meta-line" id="metaLine">Proxied stream</div>
 
-      <div class="channel-row">
-        <div class="channel-avatar" aria-hidden="true">M</div>
-        <div class="channel-info">
-          <div class="channel-name">Media Proxy</div>
-          <div class="channel-subs">Cloudflare Worker</div>
-        </div>
-        <button class="subscribe-btn" type="button">Subscribe</button>
+      <!-- URL bar (under video name) -->
+      <div class="search-row">
+        <form class="search-form" id="searchForm" autocomplete="off">
+          <input type="text" id="videoUrlInput" placeholder="Paste a video or .m3u8 URL" spellcheck="false">
+          <button type="submit" aria-label="Load">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="m20 20-3.5-3.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </form>
       </div>
 
-      <div class="chip-row">
-        <div class="like-group">
-          <button type="button" id="likeBtn">
-            <svg viewBox="0 0 24 24"><path d="M1 21h4V9H1v12zm22-11a2 2 0 0 0-2-2h-6.31l.95-4.57.03-.32a1.5 1.5 0 0 0-.44-1.06L14.17 1 7.59 7.59A2 2 0 0 0 7 9v10a2 2 0 0 0 2 2h9a2 2 0 0 0 1.84-1.21l3.02-7.05c.09-.23.14-.47.14-.74V10z"/></svg>
-            <span id="likeCount">12K</span>
-          </button>
-          <div class="divider"></div>
-          <button type="button" aria-label="Dislike">
-            <svg viewBox="0 0 24 24"><path d="M15 3H6a2 2 0 0 0-1.84 1.21L1.14 11.26c-.09.23-.14.47-.14.74v2a2 2 0 0 0 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.58-6.59A2 2 0 0 0 17 15V5a2 2 0 0 0-2-2zm4 0v12h4V3h-4z"/></svg>
-          </button>
-        </div>
-        <button class="chip" type="button">
-          <svg viewBox="0 0 24 24"><path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z"/></svg>
-          Share
-        </button>
-        <button class="chip" type="button">
-          <svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg>
-          Download
-        </button>
-        <button class="chip" type="button">
-          <svg viewBox="0 0 24 24"><path d="M14 10H3v2h11v-2zm0-4H3v2h11V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM3 16h7v-2H3v2z"/></svg>
-          Save
-        </button>
+      <div class="channel-name-row">
+        <div class="channel-name">Media Proxy</div>
+        <div class="channel-subs">Cloudflare Worker</div>
       </div>
 
       <div class="description">
         <div class="desc-title">Media Proxy Player</div>
-        <div class="desc-sub" id="descUrl">Paste any direct video URL (mp4 / webm) or an HLS playlist (.m3u8) in the search bar above. Playback is proxied through this Cloudflare Worker.</div>
+        <div class="desc-sub" id="descUrl">Paste any direct video URL (mp4 / webm) or an HLS playlist (.m3u8) in the field above. Playback is proxied through this Cloudflare Worker.</div>
       </div>
 
       <div class="comments">
@@ -593,15 +462,6 @@ function getHomePage(proxyBase) {
       buildPlayer(v);
     });
 
-    // Like toggle (UI only)
-    var liked = false;
-    var likeBtn = document.getElementById('likeBtn');
-    likeBtn.addEventListener('click', function () {
-      liked = !liked;
-      likeBtn.classList.toggle('liked', liked);
-      document.getElementById('likeCount').textContent = liked ? '12K' : '12K';
-    });
-
     // Boot with a default stream
     buildPlayer(DEFAULT_URL);
   </script>
@@ -641,4 +501,4 @@ function getErrorPage(error, targetUrl) {
   <div class="details">Request URL: ${targetUrl}\nTime: ${new Date().toISOString()}</div>
 </body>
 </html>`;
-                              }
+}
