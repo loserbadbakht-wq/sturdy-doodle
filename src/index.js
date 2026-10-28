@@ -295,6 +295,134 @@ function getHomePage(proxyBase) {
 
     var DEFAULT_URL = 'https://stream.mux.com/BV3YZtogl89mg9VcNBhhnHm02Y34zI1nlMuMQfAbl3dM/highest.mp4';
 
+    // ---------- Name decoding helpers ----------
+
+    // Known CDN / streaming hosts → friendly labels
+    var KNOWN_HOSTS = [
+      { match: /(^|\\.)ttvnw\\.net$/i,         name: 'Twitch stream' },
+      { match: /(^|\\.)twitch\\.tv$/i,         name: 'Twitch stream' },
+      { match: /(^|\\.)mux\\.com$/i,           name: 'Mux stream' },
+      { match: /(^|\\.)googlevideo\\.com$/i,   name: 'YouTube video' },
+      { match: /(^|\\.)youtube\\.com$/i,       name: 'YouTube video' },
+      { match: /(^|\\.)cloudfront\\.net$/i,    name: 'CloudFront stream' },
+      { match: /(^|\\.)akamaihd\\.net$/i,      name: 'Akamai stream' },
+      { match: /(^|\\.)akamai\\.net$/i,        name: 'Akamai stream' },
+      { match: /(^|\\.)fastly\\.net$/i,        name: 'Fastly stream' },
+      { match: /(^|\\.)bunnycdn\\.com$/i,      name: 'Bunny stream' }
+    ];
+    var HOST_PREFIX_BLACKLIST = ['www', 'api', 'cdn', 'static', 'media', 'playlist', 'live', 'edge'];
+
+    function safeDecode(s) {
+      try { return decodeURIComponent(s); } catch (e) { return s; }
+    }
+
+    // An opaque token: long base64url or hex blob (Twitch tokens, signed URLs, etc.)
+    function isOpaqueToken(s) {
+      if (!s || s.length < 32) return false;
+      if (/^[A-Za-z0-9_-]{32,}$/.test(s)) return true;
+      if (/^[0-9a-f]{32,}$/i.test(s)) return true;
+      return false;
+    }
+
+    // Try to extract readable text from a base64url token.
+    function tryDecodeToken(token) {
+      if (!token || token.length < 32) return '';
+      if (!/^[A-Za-z0-9_-]+$/.test(token)) return '';
+      try {
+        var b64 = token.replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        var bin = atob(b64);
+        if (!bin.length) return '';
+        var printable = 0;
+        var runs = [];
+        var cur = '';
+        for (var i = 0; i < bin.length; i++) {
+          var c = bin.charCodeAt(i);
+          if (c >= 32 && c < 127) {
+            printable++;
+            cur += bin.charAt(i);
+          } else {
+            if (cur.length >= 4) runs.push(cur);
+            cur = '';
+          }
+        }
+        if (cur.length >= 4) runs.push(cur);
+        if (!printable || printable / bin.length < 0.6) return '';
+        runs.sort(function (a, b) { return b.length - a.length; });
+        var best = runs[0];
+        if (!best) return '';
+        best = best.replace(/[^A-Za-z0-9 ._\\-]+/g, ' ').replace(/\\s+/g, ' ').trim();
+        if (best.length < 3) return '';
+        if (best.length > 60) best = best.slice(0, 57) + '…';
+        return best;
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function titleForUrl(url) {
+      try {
+        var u = new URL(url);
+        var host = u.hostname.toLowerCase();
+
+        // 1) Known provider?
+        for (var i = 0; i < KNOWN_HOSTS.length; i++) {
+          if (KNOWN_HOSTS[i].match.test(host)) {
+            var sub = host.split('.')[0];
+            var rm = sub.match(/^([a-z]{2,5})(\\d+)?$/i);
+            var label = KNOWN_HOSTS[i].name;
+            if (rm && HOST_PREFIX_BLACKLIST.indexOf(rm[1].toLowerCase()) === -1) {
+              return label + ' · ' + rm[1].toUpperCase();
+            }
+            return label;
+          }
+        }
+
+        var parts = u.pathname.split('/').filter(Boolean);
+        var lastSeg = '';
+        if (parts.length) {
+          lastSeg = safeDecode(parts[parts.length - 1]).replace(/\\.[a-z0-9]{1,6}$/i, '');
+        }
+
+        // 2) Opaque token in the filename? Decode or fall back.
+        if (isOpaqueToken(lastSeg)) {
+          var decoded = tryDecodeToken(lastSeg);
+          if (decoded) return decoded;
+
+          // Walk back through path segments for a meaningful folder name
+          for (var j = parts.length - 2; j >= 0; j--) {
+            var seg = safeDecode(parts[j]).replace(/\\.[a-z0-9]{1,6}$/i, '');
+            if (seg && !isOpaqueToken(seg)) {
+              return seg + ' stream';
+            }
+          }
+
+          // Fall back to a cleaned-up hostname
+          var cleanHost = host.replace(/^(www|playlist|cdn|media|static|api|live|edge)\\./i, '');
+          return cleanHost + ' stream';
+        }
+
+        // 3) Normal filename
+        if (lastSeg) return lastSeg;
+
+        // 4) Use the first meaningful path segment
+        for (var k = 0; k < parts.length; k++) {
+          var s = safeDecode(parts[k]).replace(/\\.[a-z0-9]{1,6}$/i, '');
+          if (s && !isOpaqueToken(s)) return s + ' stream';
+        }
+
+        // 5) Last resort
+        var cleanHost2 = host.replace(/^(www|playlist|cdn|media|static|api|live|edge)\\./i, '');
+        return cleanHost2 + ' stream';
+      } catch (e) {
+        return 'Video';
+      }
+    }
+
+    function hostForUrl(url) {
+      try { return new URL(url).hostname; } catch (e) { return 'proxied stream'; }
+    }
+
     function normalizeUrl(url) {
       if (!/^https?:\\/\\//i.test(url)) {
         if (url.indexOf('//') === 0) url = 'https:' + url;
@@ -309,22 +437,6 @@ function getHomePage(proxyBase) {
 
     function toProxiedUrl(url) {
       return window.location.origin + '/' + url;
-    }
-
-    function titleForUrl(url) {
-      try {
-        var u = new URL(url);
-        var parts = u.pathname.split('/').filter(Boolean);
-        var name = parts.length ? parts[parts.length - 1] : u.hostname;
-        name = decodeURIComponent(name).replace(/\\.[a-z0-9]+$/i, '');
-        return name || u.hostname;
-      } catch (e) {
-        return 'Video';
-      }
-    }
-
-    function hostForUrl(url) {
-      try { return new URL(url).hostname; } catch (e) { return 'proxied stream'; }
     }
 
     function safePlay(el) {
@@ -375,10 +487,11 @@ function getHomePage(proxyBase) {
         safePlay(media2);
       }
 
-      document.getElementById('videoTitle').textContent = titleForUrl(url);
+      var niceTitle = titleForUrl(url);
+      document.getElementById('videoTitle').textContent = niceTitle;
       document.getElementById('metaLine').textContent = hostForUrl(url) + ' · proxied';
       document.getElementById('videoUrlInput').value = url;
-      document.title = titleForUrl(url) + ' - YouTube';
+      document.title = niceTitle + ' - YouTube';
     }
 
     document.getElementById('searchForm').addEventListener('submit', function (e) {
@@ -427,4 +540,4 @@ function getErrorPage(error, targetUrl) {
   <div class="details">Request URL: ${targetUrl}\nTime: ${new Date().toISOString()}</div>
 </body>
 </html>`;
-}
+    }
