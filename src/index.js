@@ -184,7 +184,7 @@ async function handleRequest(request) {
 }
 
 // ============================
-// Landing Page (YouTube-style UI + Video.js 10 player)
+// Landing Page (Player + title + URL bar only)
 // ============================
 function getHomePage(proxyBase) {
   return new Response(`<!DOCTYPE html>
@@ -203,7 +203,7 @@ function getHomePage(proxyBase) {
       font-family: Roboto, "YouTube Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
       -webkit-tap-highlight-color: transparent;
-      padding-bottom: 64px;
+      padding-bottom: 24px;
     }
     .shell { max-width: 480px; margin: 0 auto; }
 
@@ -251,43 +251,6 @@ function getHomePage(proxyBase) {
     }
     .search-form button:active { background: #3f3f3f; }
     .search-form button svg { width: 18px; height: 18px; }
-
-    /* ---------- Channel name ---------- */
-    .channel-name-row { padding: 0 12px 12px; }
-    .channel-name { font-size: 14px; font-weight: 500; color: #f1f1f1; }
-    .channel-subs { font-size: 12px; color: #aaa; }
-
-    /* ---------- Description ---------- */
-    .description {
-      margin: 0 12px 12px; padding: 12px;
-      background: #272727; border-radius: 12px;
-      font-size: 13px; line-height: 1.45;
-    }
-    .description .desc-title { font-weight: 500; margin-bottom: 4px; }
-    .description .desc-sub { color: #aaa; font-size: 12px; word-break: break-all; }
-
-    /* ---------- Comments ---------- */
-    .comments { padding: 4px 12px 20px; }
-    .comments-head {
-      display: flex; align-items: center; gap: 8px;
-      font-size: 14px; font-weight: 500;
-    }
-    .comments-head svg { width: 20px; height: 20px; fill: currentColor; }
-
-    /* ---------- Bottom nav ---------- */
-    .bottom-nav {
-      position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
-      margin: 0 auto; max-width: 480px;
-      display: flex; padding: 6px 0 8px;
-      background: #0f0f0f; border-top: 1px solid #272727;
-    }
-    .nav-item {
-      flex: 1; display: flex; flex-direction: column; align-items: center;
-      gap: 3px; padding: 2px 0; border: 0; background: none;
-      color: #aaa; font-size: 10px; font-family: inherit; cursor: pointer;
-    }
-    .nav-item svg { width: 24px; height: 24px; fill: currentColor; display: block; }
-    .nav-item.active { color: #f1f1f1; }
   </style>
 </head>
 <body>
@@ -313,45 +276,8 @@ function getHomePage(proxyBase) {
           </button>
         </form>
       </div>
-
-      <div class="channel-name-row">
-        <div class="channel-name">Media Proxy</div>
-        <div class="channel-subs">Cloudflare Worker</div>
-      </div>
-
-      <div class="description">
-        <div class="desc-title">Media Proxy Player</div>
-        <div class="desc-sub" id="descUrl">Paste any direct video URL (mp4 / webm) or an HLS playlist (.m3u8) in the field above. Playback is proxied through this Cloudflare Worker.</div>
-      </div>
-
-      <div class="comments">
-        <div class="comments-head">
-          <svg viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z"/></svg>
-          <span>Comments</span>
-        </div>
-      </div>
     </main>
   </div>
-
-  <!-- Bottom navigation -->
-  <nav class="bottom-nav">
-    <button class="nav-item active" type="button">
-      <svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v8h6v-6h2v6h6v-8h3z"/></svg>
-      Home
-    </button>
-    <button class="nav-item" type="button">
-      <svg viewBox="0 0 24 24"><path d="M17.77 10.32 10.9 6.36a2 2 0 0 0-3 1.74v7.8a2 2 0 0 0 3 1.74l6.87-3.96a2 2 0 0 0 0-3.36z"/></svg>
-      Shorts
-    </button>
-    <button class="nav-item" type="button">
-      <svg viewBox="0 0 24 24"><path d="M20 8H4V6h16v2zm-2-6H6v2h12V2zm4 10v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2zm-6 4-6-3.27v6.54L16 16z"/></svg>
-      Subscriptions
-    </button>
-    <button class="nav-item" type="button">
-      <svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-4 0-8 2-8 5v1h16v-1c0-3-4-5-8-5z"/></svg>
-      You
-    </button>
-  </nav>
 
   <!-- Video.js 10 core (video-player + video-skin) -->
   <script type="module" src="https://cdn.jsdelivr.net/npm/@videojs/cdn@10.2.0/video.js"></script>
